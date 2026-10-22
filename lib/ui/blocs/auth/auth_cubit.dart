@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:meta/meta.dart';
@@ -12,17 +13,15 @@ class AuthCubit extends Cubit<AuthState> {
   StreamSubscription<User?>? _authStateSubscription;
 
   AuthCubit({AuthService? authService})
-      : _authService = authService ?? AuthService(),
-        super(AuthInitial()) {
+    : _authService = authService ?? AuthService(),
+      super(AuthInitial()) {
     _monitorAuthState();
   }
-  
+
   User? get user => switch (state) {
     Authenticated(user: final user) => user,
     _ => null,
   };
-
-
 
   void _monitorAuthState() {
     _authStateSubscription = _authService.authStateChanges.listen((user) {
@@ -34,16 +33,10 @@ class AuthCubit extends Cubit<AuthState> {
     });
   }
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     try {
       emit(AuthLoading());
-      await _authService.login(
-        email: email,
-        password: password,
-      );
+      await _authService.login(email: email, password: password);
     } catch (e) {
       emit(Unauthenticated());
       rethrow;
@@ -57,11 +50,7 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     try {
       emit(AuthLoading());
-      await _authService.register(
-        name: name,
-        email: email,
-        password: password,
-      );
+      await _authService.register(name: name, email: email, password: password);
     } catch (e) {
       emit(Unauthenticated());
       rethrow;

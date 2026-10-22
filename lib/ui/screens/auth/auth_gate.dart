@@ -18,9 +18,7 @@ class AuthGate extends StatelessWidget {
 
         if (state is AuthInitial) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
