@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../data/services/transaction_service.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
+import '../main/analytics_screen.dart';
 import 'home_tab.dart';
 import 'analytics_tab.dart';
 import 'profile_tab.dart';
@@ -20,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _pages = const [
     HomeTab(),
-    AnalyticsTab(),
+    AnalyticsScreen(),
     ProfileTab(),
   ];
 

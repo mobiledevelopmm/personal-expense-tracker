@@ -1,6 +1,7 @@
 
 import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -8,7 +9,7 @@ import '../../../models/transaction.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
 import '../../blocs/transaction/transaction_state.dart';
 
-enum _AnalyticsPeriod { week, month, year }
+enum _AnalyticsPeriod { thisMonth, allTime }
 
 class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});
@@ -18,7 +19,7 @@ class AnalyticsTab extends StatefulWidget {
 }
 
 class _AnalyticsTabState extends State<AnalyticsTab> {
-  _AnalyticsPeriod _period = _AnalyticsPeriod.month;
+  _AnalyticsPeriod _period = _AnalyticsPeriod.thisMonth;
 
   static const Color _mint = Color(0xFFB9E4D0);
   static const Color _income = Color(0xFF168568);
@@ -29,40 +30,25 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
           (match) => ',',
     );
-    return '\$$formatted';
-  }
 
-  DateTime _startForPeriod(DateTime now) {
-    switch (_period) {
-      case _AnalyticsPeriod.week:
-        return DateTime(now.year, now.month, now.day)
-            .subtract(Duration(days: now.weekday - 1));
-      case _AnalyticsPeriod.month:
-        return DateTime(now.year, now.month);
-      case _AnalyticsPeriod.year:
-        return DateTime(now.year);
-    }
+    return '\$$formatted';
   }
 
   List<ExpenseTransaction> _inPeriod(
       List<ExpenseTransaction> transactions,
       ) {
+    if (_period == _AnalyticsPeriod.allTime) {
+      return transactions;
+    }
+
     final now = DateTime.now();
-    final start = _startForPeriod(now);
+    final start = DateTime(now.year, now.month);
+    final end = DateTime(now.year, now.month + 1);
 
-    final end = switch (_period) {
-      _AnalyticsPeriod.week => start.add(const Duration(days: 7)),
-      _AnalyticsPeriod.month => DateTime(now.year, now.month + 1),
-      _AnalyticsPeriod.year => DateTime(now.year + 1),
-    };
-
-    return transactions
-        .where(
-          (transaction) =>
-      !transaction.date.isBefore(start) &&
-          transaction.date.isBefore(end),
-    )
-        .toList();
+    return transactions.where((transaction) {
+      return !transaction.date.isBefore(start) &&
+          transaction.date.isBefore(end);
+    }).toList();
   }
 
   @override
@@ -184,7 +170,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               ),
               const SizedBox(height: 18),
 
-              // Net cash flow card
+              // Net cash flow
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -276,7 +262,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               ),
               const SizedBox(height: 24),
 
-              // Category breakdown
+              // Spending by category
               _SectionHeading(
                 title: 'Spending by category',
                 subtitle: 'Where your money goes',
@@ -289,81 +275,149 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                   icon: Icons.donut_small_rounded,
                   title: 'No category data yet',
                   message:
-                  'Your expense categories will appear here.',
+                  'Add an expense to see your spending breakdown.',
                   color: mutedColor,
                 )
                     : Column(
                   children: [
-                    ...categories.take(6).toList().asMap().entries.map(
-                          (indexedEntry) {
-                        final index = indexedEntry.key;
-                        final entry = indexedEntry.value;
+                    SizedBox(
+                      height: 220,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 55,
+                              sections: categories
+                                  .asMap()
+                                  .entries
+                                  .map((item) {
+                                final entry = item.value;
+                                final percentage = expenseTotal > 0
+                                    ? entry.value /
+                                    expenseTotal *
+                                    100
+                                    : 0.0;
 
-                        final fraction = expenseTotal == 0
-                            ? 0.0
-                            : entry.value / expenseTotal;
-
-                        return Padding(
-                          padding:
-                          const EdgeInsets.only(bottom: 17),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      entry.key,
-                                      style: TextStyle(
-                                        color: textColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                return PieChartSectionData(
+                                  color: _categoryColor(
+                                    item.key,
+                                    colors.primary,
                                   ),
-                                  Text(
-                                    _money(entry.value),
-                                    style: TextStyle(
-                                      color: textColor,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  value: entry.value,
+                                  title:
+                                  '${percentage.round()}%',
+                                  radius: 48,
+                                  titleStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
                                   ),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 42,
-                                    child: Text(
-                                      '${(fraction * 100).round()}%',
-                                      textAlign: TextAlign.end,
-                                      style: TextStyle(
-                                        color: mutedColor,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  titlePositionPercentageOffset: 0.55,
+                                );
+                              }).toList(),
+                              pieTouchData: PieTouchData(
+                                enabled: true,
                               ),
-                              const SizedBox(height: 9),
-                              ClipRRect(
-                                borderRadius:
-                                BorderRadius.circular(10),
-                                child: LinearProgressIndicator(
-                                  value: fraction,
-                                  minHeight: 8,
-                                  backgroundColor: colors
-                                      .outlineVariant
-                                      .withValues(alpha: 0.45),
-                                  valueColor:
-                                  AlwaysStoppedAnimation<Color>(
-                                    _categoryColor(
-                                      index,
-                                      colors.primary,
-                                    ),
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Total',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _money(expenseTotal),
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 18),
+                    Divider(
+                      color: colors.outlineVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Category legend
+                    ...categories.asMap().entries.map((item) {
+                      final index = item.key;
+                      final entry = item.value;
+
+                      final percentage = expenseTotal > 0
+                          ? entry.value / expenseTotal * 100
+                          : 0.0;
+
+                      final categoryColor = _categoryColor(
+                        index,
+                        colors.primary,
+                      );
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 15),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: categoryColor,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                entry.key,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _money(entry.value),
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              width: 43,
+                              child: Text(
+                                '${percentage.toStringAsFixed(1)}%',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -372,8 +426,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               // Recent expenses
               _SectionHeading(
                 title: 'Recent expenses',
-                subtitle:
-                '${recentExpenses.length} in this ${_period.label.toLowerCase()}',
+                subtitle: '${recentExpenses.length} transactions',
                 color: textColor,
               ),
               const SizedBox(height: 12),
@@ -383,8 +436,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                     ? _EmptyInside(
                   icon: Icons.receipt_long_rounded,
                   title: 'Nothing to show yet',
-                  message:
-                  'Expenses you add will appear here.',
+                  message: 'Expenses you add will appear here.',
                   color: mutedColor,
                 )
                     : Column(
@@ -495,23 +547,19 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
 extension on _AnalyticsPeriod {
   String get label {
     switch (this) {
-      case _AnalyticsPeriod.week:
-        return 'Week';
-      case _AnalyticsPeriod.month:
-        return 'Month';
-      case _AnalyticsPeriod.year:
-        return 'Year';
+      case _AnalyticsPeriod.thisMonth:
+        return 'This Month';
+      case _AnalyticsPeriod.allTime:
+        return 'All Time';
     }
   }
 
   String get chartSubtitle {
     switch (this) {
-      case _AnalyticsPeriod.week:
-        return 'Daily expenses this week';
-      case _AnalyticsPeriod.month:
+      case _AnalyticsPeriod.thisMonth:
         return 'Daily expenses this month';
-      case _AnalyticsPeriod.year:
-        return 'Monthly expenses this year';
+      case _AnalyticsPeriod.allTime:
+        return 'Monthly spending history';
     }
   }
 }
@@ -739,7 +787,10 @@ class _EmptyInside extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: color, fontSize: 12),
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -809,15 +860,7 @@ class _SpendingChart extends StatelessWidget {
     final now = DateTime.now();
     final List<_ChartBucket> buckets;
 
-    if (period == _AnalyticsPeriod.week) {
-      final monday = DateTime(now.year, now.month, now.day)
-          .subtract(Duration(days: now.weekday - 1));
-
-      buckets = List.generate(7, (index) {
-        final day = monday.add(Duration(days: index));
-        return _ChartBucket(_weekday(day.weekday), day);
-      });
-    } else if (period == _AnalyticsPeriod.month) {
+    if (period == _AnalyticsPeriod.thisMonth) {
       final first = DateTime(now.year, now.month);
       final days = DateTime(now.year, now.month + 1, 0).day;
 
@@ -826,20 +869,46 @@ class _SpendingChart extends StatelessWidget {
         return _ChartBucket('${day.day}', day);
       });
     } else {
-      buckets = List.generate(12, (index) {
-        final month = DateTime(now.year, index + 1);
-        return _ChartBucket(_month(month.month), month);
-      });
+      if (transactions.isEmpty) {
+        buckets = [
+          _ChartBucket(
+            _month(now.month),
+            DateTime(now.year, now.month),
+          ),
+        ];
+      } else {
+        final earliest = transactions
+            .map((t) => DateTime(t.date.year, t.date.month))
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+
+        final monthCount =
+            (now.year - earliest.year) * 12 +
+                now.month -
+                earliest.month +
+                1;
+
+        buckets = List.generate(monthCount, (index) {
+          final month = DateTime(
+            earliest.year,
+            earliest.month + index,
+          );
+
+          return _ChartBucket(
+            '${_month(month.month)} ${month.year}',
+            month,
+          );
+        });
+      }
     }
 
     final values = List<double>.filled(buckets.length, 0);
 
     for (final transaction in transactions) {
-      final index = switch (period) {
-        _AnalyticsPeriod.week => transaction.date.weekday - 1,
-        _AnalyticsPeriod.month => transaction.date.day - 1,
-        _AnalyticsPeriod.year => transaction.date.month - 1,
-      };
+      final index = period == _AnalyticsPeriod.thisMonth
+          ? transaction.date.day - 1
+          : (transaction.date.year - buckets.first.date.year) * 12 +
+          transaction.date.month -
+          buckets.first.date.month;
 
       if (index >= 0 && index < values.length) {
         values[index] += transaction.amount;
@@ -851,16 +920,19 @@ class _SpendingChart extends StatelessWidget {
           (current, value) => math.max(current, value).toDouble(),
     );
 
-    // Show up to 15 days for the monthly chart.
-    const visibleCount = 15;
-    final startIndex = period == _AnalyticsPeriod.month &&
-        buckets.length > visibleCount
+    final visibleCount =
+    period == _AnalyticsPeriod.thisMonth ? 15 : 12;
+
+    final startIndex = buckets.length > visibleCount
+        ? period == _AnalyticsPeriod.thisMonth
         ? (now.day - visibleCount ~/ 2)
         .clamp(0, buckets.length - visibleCount)
+        : buckets.length - visibleCount
         : 0;
 
     final shownBuckets =
     buckets.skip(startIndex).take(visibleCount).toList();
+
     final shownValues =
     values.skip(startIndex).take(visibleCount).toList();
 
@@ -880,8 +952,13 @@ class _SpendingChart extends StatelessWidget {
               ),
             ),
             Text(
-              'Peak ${period == _AnalyticsPeriod.year ? 'month' : 'day'}',
-              style: TextStyle(color: muted, fontSize: 12),
+              period == _AnalyticsPeriod.thisMonth
+                  ? 'Peak day'
+                  : 'Peak month',
+              style: TextStyle(
+                color: muted,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -893,12 +970,13 @@ class _SpendingChart extends StatelessWidget {
             children: List.generate(shownBuckets.length, (index) {
               final value = shownValues[index];
               final ratio = highest <= 0 ? 0.0 : value / highest;
+              final bucketDate = shownBuckets[index].date;
 
-              final isCurrent = period == _AnalyticsPeriod.year
-                  ? shownBuckets[index].date.month == now.month
-                  : period == _AnalyticsPeriod.month
-                  ? shownBuckets[index].date.day == now.day
-                  : shownBuckets[index].date.weekday == now.weekday;
+              final isCurrent =
+              period == _AnalyticsPeriod.thisMonth
+                  ? bucketDate.day == now.day
+                  : bucketDate.year == now.year &&
+                  bucketDate.month == now.month;
 
               return Expanded(
                 child: Padding(
@@ -922,11 +1000,12 @@ class _SpendingChart extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        shownBuckets[index].label,
+                        period == _AnalyticsPeriod.thisMonth
+                            ? shownBuckets[index].label
+                            : _month(bucketDate.month),
                         style: TextStyle(
                           color: isCurrent ? emerald : muted,
-                          fontSize:
-                          period == _AnalyticsPeriod.month ? 9 : 10,
+                          fontSize: 9,
                           fontWeight: isCurrent
                               ? FontWeight.w800
                               : FontWeight.w500,
@@ -944,20 +1023,28 @@ class _SpendingChart extends StatelessWidget {
   }
 
   String _money(double amount) {
-    return '\$${amount.toStringAsFixed(2).replaceAllMapped(
+    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
           (match) => ',',
-    )}';
+    );
+
+    return '\$$formatted';
   }
 
-  String _weekday(int weekday) =>
-      const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][weekday - 1];
-
-  String _month(int month) =>
-      const [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-      ][month - 1];
+  String _month(int month) => const [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][month - 1];
 }
 
 class _ChartBucket {
