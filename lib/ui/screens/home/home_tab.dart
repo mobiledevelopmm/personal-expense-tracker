@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -26,8 +25,7 @@ class _HomeTabState extends State<HomeTab> {
   static const Color _income = Color(0xFF168568);
   static const Color _expense = Color(0xFFC45B58);
 
-  bool get _isDark =>
-      Theme.of(context).brightness == Brightness.dark;
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
   Color get _background => Theme.of(context).scaffoldBackgroundColor;
   Color get _surface => Theme.of(context).colorScheme.surface;
@@ -35,13 +33,11 @@ class _HomeTabState extends State<HomeTab> {
   Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
   Color get _border => Theme.of(context).colorScheme.outlineVariant;
 
-  Color get _mintLight => _isDark
-      ? const Color(0xFF203A35)
-      : const Color(0xFFE3F3EB);
+  Color get _mintLight =>
+      _isDark ? const Color(0xFF203A35) : const Color(0xFFE3F3EB);
 
-  Color get _expenseLight => _isDark
-      ? const Color(0xFF422B2B)
-      : const Color(0xFFFAECEA);
+  Color get _expenseLight =>
+      _isDark ? const Color(0xFF422B2B) : const Color(0xFFFAECEA);
 
   Future<void> _openAddTransaction(TransactionType type) async {
     await Navigator.push(
@@ -73,7 +69,7 @@ class _HomeTabState extends State<HomeTab> {
     final parts = fixedAmount.split('.');
     final wholeNumber = parts[0].replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ',',
+      (match) => ',',
     );
     final sign = amount < 0 ? '-' : '';
 
@@ -150,15 +146,10 @@ class _HomeTabState extends State<HomeTab> {
               tooltip: 'Notifications',
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Notifications coming soon.'),
-                  ),
+                  const SnackBar(content: Text('Notifications coming soon.')),
                 );
               },
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                size: 22,
-              ),
+              icon: const Icon(Icons.notifications_none_rounded, size: 22),
               style: IconButton.styleFrom(
                 backgroundColor: _surface,
                 foregroundColor: _textPrimary,
@@ -206,10 +197,7 @@ class _HomeTabState extends State<HomeTab> {
                     subtitle: 'Your financial overview',
                   ),
                   const SizedBox(height: 16),
-                  _buildMonthlySummary(
-                    monthlyIncome,
-                    monthlyExpenses,
-                  ),
+                  _buildMonthlySummary(monthlyIncome, monthlyExpenses),
                   const SizedBox(height: 30),
                   _buildSectionHeader(
                     title: 'Recent Transactions',
@@ -225,9 +213,9 @@ class _HomeTabState extends State<HomeTab> {
                       transactions.isEmpty)
                     _buildError(state.errorMessage)
                   else if (transactions.isEmpty)
-                      _buildEmptyTransactions()
-                    else
-                      _buildRecentTransactions(transactions),
+                    _buildEmptyTransactions()
+                  else
+                    _buildRecentTransactions(transactions),
                 ],
               ),
             );
@@ -276,11 +264,7 @@ class _HomeTabState extends State<HomeTab> {
         const SizedBox(height: 7),
         Text(
           'Make every dollar count.',
-          style: TextStyle(
-            color: _muted,
-            fontSize: 14,
-            height: 1.5,
-          ),
+          style: TextStyle(color: _muted, fontSize: 14, height: 1.5),
         ),
       ],
     );
@@ -339,9 +323,7 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                   const SizedBox(width: 8),
                   InkWell(
-                    onTap: () => setState(
-                          () => _hideBalance = !_hideBalance,
-                    ),
+                    onTap: () => setState(() => _hideBalance = !_hideBalance),
                     borderRadius: BorderRadius.circular(20),
                     child: Padding(
                       padding: const EdgeInsets.all(5),
@@ -385,18 +367,11 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
               const SizedBox(height: 24),
-              Container(
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.16),
-              ),
+              Container(height: 1, color: Colors.white.withValues(alpha: 0.16)),
               const SizedBox(height: 17),
               Row(
                 children: [
-                  const Icon(
-                    Icons.shield_outlined,
-                    color: _mint,
-                    size: 18,
-                  ),
+                  const Icon(Icons.shield_outlined, color: _mint, size: 18),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
@@ -417,28 +392,47 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildQuickActions() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _buildActionCard(
-            title: 'Add Income',
-            subtitle: 'Money in',
-            icon: Icons.south_west_rounded,
-            color: _income,
-            background: _mintLight,
-            onTap: () => _openAddTransaction(TransactionType.income),
+        Text(
+          'Quick Actions',
+          style: TextStyle(
+            color: _textPrimary,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _buildActionCard(
-            title: 'Add Expense',
-            subtitle: 'Money out',
-            icon: Icons.north_east_rounded,
-            color: _expense,
-            background: _expenseLight,
-            onTap: () => _openAddTransaction(TransactionType.expense),
-          ),
+        const SizedBox(height: 5),
+        Text(
+          'What would you like to do today?',
+          style: TextStyle(color: _muted, fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                title: 'Add Income',
+                subtitle: 'Money received',
+                icon: Icons.add_rounded,
+                color: const Color(0xFFFFFFFF),
+                background: _emerald,
+                onTap: () => _openAddTransaction(TransactionType.income),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                title: 'Add Expense',
+                subtitle: 'Money spent',
+                icon: Icons.remove_rounded,
+                color: const Color(0xFFFFFFFF),
+                background: _expense,
+                onTap: () => _openAddTransaction(TransactionType.expense),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -453,34 +447,51 @@ class _HomeTabState extends State<HomeTab> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: _surface,
-      borderRadius: BorderRadius.circular(21),
+      color: background,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(21),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(21),
-            border: Border.all(color: _border),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: background.withValues(alpha: 0.15),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 45,
-                height: 45,
-                decoration: BoxDecoration(
-                  color: background,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(icon, color: color, size: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.17),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: color, size: 25),
+                  ),
+                  Icon(
+                    Icons.arrow_outward_rounded,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    size: 19,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Text(
                 title,
                 style: TextStyle(
-                  color: _textPrimary,
+                  color: color,
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -488,7 +499,12 @@ class _HomeTabState extends State<HomeTab> {
               const SizedBox(height: 5),
               Text(
                 subtitle,
-                style: TextStyle(color: _muted, fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.8),
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -519,10 +535,7 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
-                subtitle,
-                style: TextStyle(color: _muted, fontSize: 12),
-              ),
+              Text(subtitle, style: TextStyle(color: _muted, fontSize: 12)),
             ],
           ),
         ),
@@ -530,8 +543,7 @@ class _HomeTabState extends State<HomeTab> {
           TextButton(
             onPressed: onAction,
             style: TextButton.styleFrom(
-              foregroundColor:
-              _isDark ? const Color(0xFF7DD3C7) : _emeraldDark,
+              foregroundColor: _isDark ? const Color(0xFF7DD3C7) : _emeraldDark,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -549,102 +561,151 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildMonthlySummary(double income, double expenses) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            title: 'Income',
-            amount: _money(income),
-            icon: Icons.trending_up_rounded,
-            color: _income,
-            background: _mintLight,
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildMonthlyItem(
+                  title: 'Income',
+                  amount: _money(income),
+                  icon: Icons.south_west_rounded,
+                  color: _income,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 65,
+                color: _border,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              Expanded(
+                child: _buildMonthlyItem(
+                  title: 'Expenses',
+                  amount: _money(expenses),
+                  icon: Icons.north_east_rounded,
+                  color: _expense,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 18),
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              color: _expense.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: income + expenses <= 0
+                      ? 1
+                      : (income / (income + expenses) * 1000).round().clamp(
+                          1,
+                          1000,
+                        ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _income,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                if (expenses > 0)
+                  Expanded(
+                    flex: income + expenses <= 0
+                        ? 1
+                        : (expenses / (income + expenses) * 1000).round().clamp(
+                            1,
+                            1000,
+                          ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _expense,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildLegend(_income, 'Money in'),
+              _buildLegend(_expense, 'Money out'),
+              Text('This month', style: TextStyle(color: _muted, fontSize: 10)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthlyItem({
+    required String title,
+    required String amount,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 17),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _buildSummaryCard(
-            title: 'Expenses',
-            amount: _money(expenses),
-            icon: Icons.trending_down_rounded,
-            color: _expense,
-            background: _expenseLight,
+        const SizedBox(height: 12),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            amount,
+            style: TextStyle(
+              color: _textPrimary,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCard({
-    required String title,
-    required String amount,
-    required IconData icon,
-    required Color color,
-    required Color background,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 39,
-            height: 39,
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(icon, color: color, size: 21),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            title,
-            style: TextStyle(
-              color: _muted,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 7),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              amount,
-              style: TextStyle(
-                color: _textPrimary,
-                fontSize: 23,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.6,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  'This month',
-                  style: TextStyle(color: _muted, fontSize: 11),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+  Widget _buildLegend(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(color: _muted, fontSize: 10)),
+      ],
     );
   }
 
@@ -662,12 +723,7 @@ class _HomeTabState extends State<HomeTab> {
           for (int i = 0; i < recent.length; i++) ...[
             _buildTransactionTile(recent[i]),
             if (i < recent.length - 1)
-              Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: _border,
-              ),
+              Divider(height: 1, indent: 16, endIndent: 16, color: _border),
           ],
         ],
       ),
@@ -680,10 +736,7 @@ class _HomeTabState extends State<HomeTab> {
     final background = isIncome ? _mintLight : _expenseLight;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 5,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
       leading: Container(
         width: 44,
         height: 44,
@@ -752,10 +805,7 @@ class _HomeTabState extends State<HomeTab> {
           const SizedBox(height: 10),
           Text(
             'Could not load transactions',
-            style: TextStyle(
-              color: _textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(
@@ -777,10 +827,7 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildEmptyTransactions() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 28,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: _surface,
         borderRadius: BorderRadius.circular(23),
@@ -814,25 +861,17 @@ class _HomeTabState extends State<HomeTab> {
           Text(
             'Your income and expenses will appear here.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _muted,
-              fontSize: 13,
-              height: 1.6,
-            ),
+            style: TextStyle(color: _muted, fontSize: 13, height: 1.6),
           ),
           const SizedBox(height: 20),
           OutlinedButton.icon(
-            onPressed: () =>
-                _openAddTransaction(TransactionType.expense),
+            onPressed: () => _openAddTransaction(TransactionType.expense),
             icon: const Icon(Icons.add_rounded, size: 19),
             label: const Text('Add your first transaction'),
             style: OutlinedButton.styleFrom(
-              foregroundColor:
-              _isDark ? const Color(0xFF7DD3C7) : _emeraldDark,
+              foregroundColor: _isDark ? const Color(0xFF7DD3C7) : _emeraldDark,
               side: BorderSide(
-                color: _isDark
-                    ? const Color(0xFF4D9B8F)
-                    : _emerald,
+                color: _isDark ? const Color(0xFF4D9B8F) : _emerald,
               ),
               minimumSize: const Size(0, 46),
               padding: const EdgeInsets.symmetric(horizontal: 18),

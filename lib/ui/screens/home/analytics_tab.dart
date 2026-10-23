@@ -9,7 +9,7 @@ import '../../../models/transaction.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
 import '../../blocs/transaction/transaction_state.dart';
 
-enum _AnalyticsPeriod { thisMonth, allTime }
+enum _AnalyticsPeriod { month, year, allTime }
 
 class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});
@@ -19,36 +19,111 @@ class AnalyticsTab extends StatefulWidget {
 }
 
 class _AnalyticsTabState extends State<AnalyticsTab> {
-  _AnalyticsPeriod _period = _AnalyticsPeriod.thisMonth;
+  _AnalyticsPeriod _period = _AnalyticsPeriod.month;
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  int _selectedYear = DateTime.now().year;
 
   static const Color _mint = Color(0xFFB9E4D0);
   static const Color _income = Color(0xFF168568);
   static const Color _expense = Color(0xFFC45B58);
 
   String _money(double amount) {
-    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
+    final formatted = amount.abs().toStringAsFixed(2).replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ',',
+          (_) => ',',
     );
-
-    return '\$$formatted';
+    return '${amount < 0 ? '-' : ''}\$$formatted';
   }
 
   List<ExpenseTransaction> _inPeriod(
       List<ExpenseTransaction> transactions,
       ) {
-    if (_period == _AnalyticsPeriod.allTime) {
-      return transactions;
+    switch (_period) {
+      case _AnalyticsPeriod.month:
+        return transactions.where((t) =>
+        t.date.year == _selectedMonth.year &&
+            t.date.month == _selectedMonth.month).toList();
+
+      case _AnalyticsPeriod.year:
+        return transactions
+            .where((t) => t.date.year == _selectedYear)
+            .toList();
+
+      case _AnalyticsPeriod.allTime:
+        return transactions;
+    }
+  }
+
+  String get _periodLabel {
+    switch (_period) {
+      case _AnalyticsPeriod.month:
+        return '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}';
+      case _AnalyticsPeriod.year:
+        return '$_selectedYear';
+      case _AnalyticsPeriod.allTime:
+        return 'All Time';
+    }
+  }
+
+  String _monthName(int month) => const [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ][month - 1];
+
+  void _changeMonth(int amount) {
+    final now = DateTime.now();
+    final next = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + amount,
+    );
+
+    if (next.year < 2000 ||
+        next.year > now.year ||
+        (next.year == now.year && next.month > now.month)) {
+      return;
     }
 
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month);
-    final end = DateTime(now.year, now.month + 1);
+    setState(() => _selectedMonth = next);
+  }
 
-    return transactions.where((transaction) {
-      return !transaction.date.isBefore(start) &&
-          transaction.date.isBefore(end);
-    }).toList();
+  void _changeYear(int amount) {
+    final next = _selectedYear + amount;
+    if (next < 2000 || next > DateTime.now().year) return;
+    setState(() => _selectedYear = next);
+  }
+
+  Future<void> _pickPeriod() async {
+    final now = DateTime.now();
+
+    if (_period == _AnalyticsPeriod.month) {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: _selectedMonth,
+        firstDate: DateTime(2000),
+        lastDate: now,
+        initialDatePickerMode: DatePickerMode.year,
+        helpText: 'Select month',
+      );
+
+      if (picked != null && mounted) {
+        setState(() {
+          _selectedMonth = DateTime(picked.year, picked.month);
+        });
+      }
+    } else if (_period == _AnalyticsPeriod.year) {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: DateTime(_selectedYear, 1, 1),
+        firstDate: DateTime(2000),
+        lastDate: now,
+        initialDatePickerMode: DatePickerMode.year,
+        helpText: 'Select year',
+      );
+
+      if (picked != null && mounted) {
+        setState(() => _selectedYear = picked.year);
+      }
+    }
   }
 
   @override
@@ -63,16 +138,12 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Analytics'),
-        centerTitle: false,
         backgroundColor: theme.scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 18),
-            child: Icon(
-              Icons.insights_rounded,
-              color: colors.primary,
-            ),
+            child: Icon(Icons.insights_rounded, color: colors.primary),
           ),
         ],
       ),
@@ -80,51 +151,45 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
         builder: (context, state) {
           if (state.status == TransactionStatus.loading &&
               state.transactions.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (state.status == TransactionStatus.failure &&
               state.transactions.isEmpty) {
-            return _MessageState(
-              icon: Icons.cloud_off_rounded,
-              title: 'Could not load analytics',
-              message:
-              state.errorMessage ?? 'Please try again later.',
-              color: mutedColor,
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  state.errorMessage ?? 'Could not load analytics.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: textColor),
+                ),
+              ),
             );
           }
 
-          final allTransactions = state.transactions;
-          final filteredTransactions = _inPeriod(allTransactions);
+          final filtered = _inPeriod(state.transactions);
 
-          final incomeTransactions = filteredTransactions
+          final incomes = filtered
               .where((t) => t.type == TransactionType.income)
               .toList();
 
-          final expenses = filteredTransactions
+          final expenses = filtered
               .where((t) => t.type == TransactionType.expense)
               .toList();
 
-          final incomeTotal = incomeTransactions.fold<double>(
-            0,
-                (sum, transaction) => sum + transaction.amount,
-          );
+          final incomeTotal =
+          incomes.fold<double>(0, (sum, t) => sum + t.amount);
 
-          final expenseTotal = expenses.fold<double>(
-            0,
-                (sum, transaction) => sum + transaction.amount,
-          );
+          final expenseTotal =
+          expenses.fold<double>(0, (sum, t) => sum + t.amount);
 
-          final balance = incomeTotal - expenseTotal;
+          final netBalance = incomeTotal - expenseTotal;
 
           final categoryTotals = <String, double>{};
-
-          for (final transaction in expenses) {
-            categoryTotals[transaction.category] =
-                (categoryTotals[transaction.category] ?? 0) +
-                    transaction.amount;
+          for (final t in expenses) {
+            categoryTotals[t.category] =
+                (categoryTotals[t.category] ?? 0) + t.amount;
           }
 
           final categories = categoryTotals.entries.toList()
@@ -133,17 +198,11 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
           final recentExpenses = [...expenses]
             ..sort((a, b) => b.date.compareTo(a.date));
 
-          final peakExpense = expenses.isEmpty
-              ? 0.0
-              : expenses
-              .map((transaction) => transaction.amount)
-              .reduce(math.max);
-
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             children: [
               Text(
-                'Your Money Insights',
+                'Your Money Overview',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: textColor,
@@ -151,39 +210,69 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Understand your income and spending habits.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: mutedColor,
-                ),
+                'Understand where your money goes.',
+                style: TextStyle(color: mutedColor),
               ),
               const SizedBox(height: 20),
 
-              // Period selector
+              // Three period options
               _PeriodSelector(
                 selected: _period,
                 onChanged: (value) {
-                  setState(() => _period = value);
+                  setState(() {
+                    _period = value;
+                    final now = DateTime.now();
+                    if (_selectedYear > now.year) {
+                      _selectedYear = now.year;
+                    }
+                  });
                 },
-                emerald: colors.primary,
+                primary: colors.primary,
                 surface: colors.surface,
                 muted: mutedColor,
+                border: colors.outlineVariant,
               ),
+              const SizedBox(height: 12),
+
+              if (_period != _AnalyticsPeriod.allTime)
+                _PeriodNavigator(
+                  label: _periodLabel,
+                  onPrevious: () {
+                    if (_period == _AnalyticsPeriod.month) {
+                      _changeMonth(-1);
+                    } else {
+                      _changeYear(-1);
+                    }
+                  },
+                  onNext: () {
+                    if (_period == _AnalyticsPeriod.month) {
+                      _changeMonth(1);
+                    } else {
+                      _changeYear(1);
+                    }
+                  },
+                  onPick: _pickPeriod,
+                  canGoNext: _period == _AnalyticsPeriod.month
+                      ? _selectedMonth.year < DateTime.now().year ||
+                      (_selectedMonth.year == DateTime.now().year &&
+                          _selectedMonth.month < DateTime.now().month)
+                      : _selectedYear < DateTime.now().year,
+                  surface: colors.surface,
+                  border: colors.outlineVariant,
+                  text: textColor,
+                  muted: mutedColor,
+                ),
+
               const SizedBox(height: 18),
 
-              // Net cash flow
+              // Summary
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isDark
-                        ? const [
-                      Color(0xFF1B3042),
-                      Color(0xFF123F3B),
-                    ]
-                        : const [
-                      Color(0xFF115E59),
-                      Color(0xFF0F766E),
-                    ],
+                        ? const [Color(0xFF1B3042), Color(0xFF123F3B)]
+                        : const [Color(0xFF115E59), Color(0xFF0F766E)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -193,39 +282,39 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_period.label} net cash flow',
+                      '$_periodLabel net balance',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${balance < 0 ? '-' : ''}${_money(balance.abs())}',
+                      _money(netBalance),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 30,
+                        fontSize: 28,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 18),
                     Row(
                       children: [
                         Expanded(
-                          child: _HeroAmount(
+                          child: _AmountTile(
                             label: 'Income',
                             amount: _money(incomeTotal),
                             icon: Icons.south_west_rounded,
+                            color: _income,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _HeroAmount(
+                          child: _AmountTile(
                             label: 'Expenses',
                             amount: _money(expenseTotal),
                             icon: Icons.north_east_rounded,
+                            color: _expense,
                           ),
                         ),
                       ],
@@ -233,115 +322,102 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // Spending trend
+              const SizedBox(height: 24),
               _SectionHeading(
-                title: 'Spending trend',
-                subtitle: _period.chartSubtitle,
+                title: 'Spending Trend',
+                subtitle: _period == _AnalyticsPeriod.month
+                    ? 'Daily spending · $_periodLabel'
+                    : _period == _AnalyticsPeriod.year
+                    ? 'Monthly spending · $_selectedYear'
+                    : 'Monthly spending history',
                 color: textColor,
               ),
               const SizedBox(height: 12),
               _AnalyticsCard(
                 child: expenses.isEmpty
-                    ? _EmptyInside(
-                  icon: Icons.bar_chart_rounded,
-                  title: 'No spending data yet',
-                  message:
-                  'Add an expense to see your spending trend.',
+                    ? _EmptyAnalytics(
+                  title: 'No spending data',
+                  message: 'No expenses recorded for $_periodLabel.',
                   color: mutedColor,
                 )
                     : _SpendingChart(
                   transactions: expenses,
                   period: _period,
-                  emerald: colors.primary,
+                  selectedMonth: _selectedMonth,
+                  selectedYear: _selectedYear,
+                  primary: colors.primary,
                   mint: _mint,
                   text: textColor,
                   muted: mutedColor,
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // Spending by category
+              const SizedBox(height: 24),
               _SectionHeading(
-                title: 'Spending by category',
-                subtitle: 'Where your money goes',
+                title: 'Expense Breakdown',
+                subtitle: 'Spending by category · $_periodLabel',
                 color: textColor,
               ),
               const SizedBox(height: 12),
               _AnalyticsCard(
                 child: categories.isEmpty
-                    ? _EmptyInside(
-                  icon: Icons.donut_small_rounded,
-                  title: 'No category data yet',
-                  message:
-                  'Add an expense to see your spending breakdown.',
+                    ? _EmptyAnalytics(
+                  title: 'No category data',
+                  message: 'Expenses will appear here by category.',
                   color: mutedColor,
                 )
                     : Column(
                   children: [
                     SizedBox(
-                      height: 220,
+                      height: 230,
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
                           PieChart(
                             PieChartData(
                               sectionsSpace: 3,
-                              centerSpaceRadius: 55,
+                              centerSpaceRadius: 53,
                               sections: categories
                                   .asMap()
                                   .entries
                                   .map((item) {
                                 final entry = item.value;
-                                final percentage = expenseTotal > 0
-                                    ? entry.value /
-                                    expenseTotal *
-                                    100
+                                final percent = expenseTotal > 0
+                                    ? entry.value / expenseTotal * 100
                                     : 0.0;
 
                                 return PieChartSectionData(
-                                  color: _categoryColor(
-                                    item.key,
-                                    colors.primary,
-                                  ),
+                                  color: _categoryColor(item.key),
                                   value: entry.value,
-                                  title:
-                                  '${percentage.round()}%',
+                                  title: '${percent.round()}%',
                                   radius: 48,
                                   titleStyle: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                   ),
-                                  titlePositionPercentageOffset: 0.55,
                                 );
                               }).toList(),
-                              pieTouchData: PieTouchData(
-                                enabled: true,
-                              ),
                             ),
                           ),
                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Total',
+                                'Total Expenses',
                                 style: TextStyle(
                                   color: mutedColor,
-                                  fontSize: 12,
+                                  fontSize: 11,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  _money(expenseTotal),
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                              const SizedBox(height: 5),
+                              Text(
+                                _money(expenseTotal),
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ],
@@ -349,37 +425,23 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Divider(
-                      color: colors.outlineVariant.withValues(
-                        alpha: 0.5,
-                      ),
-                    ),
+                    Divider(color: colors.outlineVariant),
                     const SizedBox(height: 12),
-
-                    // Category legend
                     ...categories.asMap().entries.map((item) {
-                      final index = item.key;
                       final entry = item.value;
-
-                      final percentage = expenseTotal > 0
+                      final percent = expenseTotal > 0
                           ? entry.value / expenseTotal * 100
                           : 0.0;
 
-                      final categoryColor = _categoryColor(
-                        index,
-                        colors.primary,
-                      );
-
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 15),
+                        padding: const EdgeInsets.only(bottom: 14),
                         child: Row(
                           children: [
                             Container(
-                              width: 12,
-                              height: 12,
+                              width: 11,
+                              height: 11,
                               decoration: BoxDecoration(
-                                color: categoryColor,
+                                color: _categoryColor(item.key),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -389,7 +451,6 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                                 entry.key,
                                 style: TextStyle(
                                   color: textColor,
-                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -398,15 +459,14 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                               _money(entry.value),
                               style: TextStyle(
                                 color: textColor,
-                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(width: 10),
                             SizedBox(
-                              width: 43,
+                              width: 48,
                               child: Text(
-                                '${percentage.toStringAsFixed(1)}%',
+                                '${percent.toStringAsFixed(1)}%',
                                 textAlign: TextAlign.end,
                                 style: TextStyle(
                                   color: mutedColor,
@@ -421,22 +481,21 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // Recent expenses
+              const SizedBox(height: 24),
               _SectionHeading(
-                title: 'Recent expenses',
-                subtitle: '${recentExpenses.length} transactions',
+                title: 'Recent Expenses',
+                subtitle:
+                '${recentExpenses.length} transactions · $_periodLabel',
                 color: textColor,
               ),
               const SizedBox(height: 12),
               _AnalyticsCard(
                 padding: EdgeInsets.zero,
                 child: recentExpenses.isEmpty
-                    ? _EmptyInside(
-                  icon: Icons.receipt_long_rounded,
+                    ? _EmptyAnalytics(
                   title: 'Nothing to show yet',
-                  message: 'Expenses you add will appear here.',
+                  message: 'Expenses for this period appear here.',
                   color: mutedColor,
                 )
                     : Column(
@@ -449,8 +508,8 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                           color: _expense.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(
-                          _categoryIcon(item.category),
+                        child: const Icon(
+                          Icons.receipt_long_rounded,
                           color: _expense,
                         ),
                       ),
@@ -483,16 +542,6 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 8),
-              if (allTransactions.isEmpty)
-                Text(
-                  'Tip: add your first income or expense from the Home tab.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: mutedColor,
-                    fontSize: 12,
-                  ),
-                ),
             ],
           );
         },
@@ -500,7 +549,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
     );
   }
 
-  Color _categoryColor(int index, Color primary) {
+  Color _categoryColor(int index) {
     const palette = [
       Color(0xFF0F766E),
       Color(0xFF4D9B83),
@@ -508,130 +557,176 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
       Color(0xFFD49B55),
       Color(0xFF7B8FC7),
       Color(0xFFC45B58),
+      Color(0xFF9274B8),
+      Color(0xFF4F91A8),
     ];
-
-    return index < palette.length ? palette[index] : primary;
+    return palette[index % palette.length];
   }
 
-  IconData _categoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'food & dining':
-        return Icons.restaurant_rounded;
-      case 'transport':
-      case 'transportation':
-        return Icons.directions_car_rounded;
-      case 'shopping':
-        return Icons.shopping_bag_rounded;
-      case 'bills':
-      case 'utilities':
-        return Icons.receipt_rounded;
-      case 'health':
-        return Icons.favorite_rounded;
-      case 'entertainment':
-        return Icons.movie_rounded;
-      case 'salary':
-        return Icons.work_rounded;
-      default:
-        return Icons.wallet_rounded;
-    }
-  }
-
-  String _dateLabel(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/'
-        '${date.year}';
-  }
+  String _dateLabel(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+          '${date.month.toString().padLeft(2, '0')}/'
+          '${date.year}';
 }
 
-extension on _AnalyticsPeriod {
-  String get label {
-    switch (this) {
-      case _AnalyticsPeriod.thisMonth:
-        return 'This Month';
-      case _AnalyticsPeriod.allTime:
-        return 'All Time';
-    }
-  }
-
-  String get chartSubtitle {
-    switch (this) {
-      case _AnalyticsPeriod.thisMonth:
-        return 'Daily expenses this month';
-      case _AnalyticsPeriod.allTime:
-        return 'Monthly spending history';
-    }
-  }
-}
 
 class _PeriodSelector extends StatelessWidget {
   const _PeriodSelector({
     required this.selected,
     required this.onChanged,
-    required this.emerald,
+    required this.primary,
     required this.surface,
     required this.muted,
+    required this.border,
   });
 
   final _AnalyticsPeriod selected;
   final ValueChanged<_AnalyticsPeriod> onChanged;
-  final Color emerald;
+  final Color primary;
   final Color surface;
   final Color muted;
+  final Color border;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: border),
       ),
       child: Row(
-        children: _AnalyticsPeriod.values.map((period) {
-          final active = selected == period;
+        children: [
+          _buildOption(_AnalyticsPeriod.month, 'Month'),
+          _buildOption(_AnalyticsPeriod.year, 'Year'),
+          _buildOption(_AnalyticsPeriod.allTime, 'All Time'),
+        ],
+      ),
+    );
+  }
 
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(period),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                decoration: BoxDecoration(
-                  color: active ? emerald : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  period.label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: active ? Colors.white : muted,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
+  Widget _buildOption(_AnalyticsPeriod period, String label) {
+    final active = selected == period;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(period),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            style: TextStyle(
+              color: active ? Colors.white : muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
-          );
-        }).toList(),
+          ),
+        ),
       ),
     );
   }
 }
 
-class _HeroAmount extends StatelessWidget {
-  const _HeroAmount({
+class _PeriodNavigator extends StatelessWidget {
+  const _PeriodNavigator({
+    required this.label,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onPick,
+    required this.canGoNext,
+    required this.surface,
+    required this.border,
+    required this.text,
+    required this.muted,
+  });
+
+  final String label;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onPick;
+  final bool canGoNext;
+  final Color surface;
+  final Color border;
+  final Color text;
+  final Color muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onPrevious,
+            tooltip: 'Previous period',
+            icon: Icon(Icons.chevron_left_rounded, color: muted),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: onPick,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_month_rounded, color: text, size: 19),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: text,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: canGoNext ? onNext : null,
+            tooltip: 'Next period',
+            icon: Icon(
+              Icons.chevron_right_rounded,
+              color: canGoNext ? muted : muted.withValues(alpha: 0.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmountTile extends StatelessWidget {
+  const _AmountTile({
     required this.label,
     required this.amount,
     required this.icon,
+    required this.color,
   });
 
   final String label;
   final String amount;
   final IconData icon;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -647,7 +742,7 @@ class _HeroAmount extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 18, color: Colors.white70),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -659,16 +754,16 @@ class _HeroAmount extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
                     amount,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
-                      fontSize: 15,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -748,15 +843,13 @@ class _AnalyticsCard extends StatelessWidget {
   }
 }
 
-class _EmptyInside extends StatelessWidget {
-  const _EmptyInside({
-    required this.icon,
+class _EmptyAnalytics extends StatelessWidget {
+  const _EmptyAnalytics({
     required this.title,
     required this.message,
     required this.color,
   });
 
-  final IconData icon;
   final String title;
   final String message;
   final Color color;
@@ -764,17 +857,10 @@ class _EmptyInside extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 24,
-        horizontal: 10,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 10),
       child: Column(
         children: [
-          Icon(
-            icon,
-            size: 34,
-            color: color.withValues(alpha: 0.75),
-          ),
+          Icon(Icons.insert_chart_outlined_rounded, size: 36, color: color),
           const SizedBox(height: 10),
           Text(
             title,
@@ -783,56 +869,13 @@ class _EmptyInside extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: color, fontSize: 12),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MessageState extends StatelessWidget {
-  const _MessageState({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 44, color: color),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: color),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -842,7 +885,9 @@ class _SpendingChart extends StatelessWidget {
   const _SpendingChart({
     required this.transactions,
     required this.period,
-    required this.emerald,
+    required this.selectedMonth,
+    required this.selectedYear,
+    required this.primary,
     required this.mint,
     required this.text,
     required this.muted,
@@ -850,65 +895,77 @@ class _SpendingChart extends StatelessWidget {
 
   final List<ExpenseTransaction> transactions;
   final _AnalyticsPeriod period;
-  final Color emerald;
+  final DateTime selectedMonth;
+  final int selectedYear;
+  final Color primary;
   final Color mint;
   final Color text;
   final Color muted;
 
+  String _money(double amount) {
+    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (_) => ',',
+    );
+    return '\$$formatted';
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final List<_ChartBucket> buckets;
 
-    if (period == _AnalyticsPeriod.thisMonth) {
-      final first = DateTime(now.year, now.month);
-      final days = DateTime(now.year, now.month + 1, 0).day;
+    late final List<DateTime> bucketDates;
+    late final List<String> labels;
 
-      buckets = List.generate(days, (index) {
-        final day = first.add(Duration(days: index));
-        return _ChartBucket('${day.day}', day);
-      });
+    if (period == _AnalyticsPeriod.month) {
+      final days = DateTime(
+        selectedMonth.year,
+        selectedMonth.month + 1,
+        0,
+      ).day;
+
+      bucketDates = List.generate(
+        days,
+            (i) => DateTime(selectedMonth.year, selectedMonth.month, i + 1),
+      );
+      labels = bucketDates.map((d) => '${d.day}').toList();
+    } else if (period == _AnalyticsPeriod.year) {
+      bucketDates = List.generate(
+        12,
+            (i) => DateTime(selectedYear, i + 1),
+      );
+      labels = bucketDates.map((d) => _month(d.month)).toList();
     } else {
       if (transactions.isEmpty) {
-        buckets = [
-          _ChartBucket(
-            _month(now.month),
-            DateTime(now.year, now.month),
-          ),
-        ];
+        bucketDates = [DateTime(now.year, now.month)];
       } else {
         final earliest = transactions
             .map((t) => DateTime(t.date.year, t.date.month))
             .reduce((a, b) => a.isBefore(b) ? a : b);
 
-        final monthCount =
-            (now.year - earliest.year) * 12 +
-                now.month -
-                earliest.month +
-                1;
+        final count = (now.year - earliest.year) * 12 +
+            now.month -
+            earliest.month +
+            1;
 
-        buckets = List.generate(monthCount, (index) {
-          final month = DateTime(
-            earliest.year,
-            earliest.month + index,
-          );
-
-          return _ChartBucket(
-            '${_month(month.month)} ${month.year}',
-            month,
-          );
-        });
+        bucketDates = List.generate(
+          count,
+              (i) => DateTime(earliest.year, earliest.month + i),
+        );
       }
+      labels = bucketDates.map((d) => _month(d.month)).toList();
     }
 
-    final values = List<double>.filled(buckets.length, 0);
+    final values = List<double>.filled(bucketDates.length, 0);
 
     for (final transaction in transactions) {
-      final index = period == _AnalyticsPeriod.thisMonth
+      final index = period == _AnalyticsPeriod.month
           ? transaction.date.day - 1
-          : (transaction.date.year - buckets.first.date.year) * 12 +
+          : period == _AnalyticsPeriod.year
+          ? transaction.date.month - 1
+          : (transaction.date.year - bucketDates.first.year) * 12 +
           transaction.date.month -
-          buckets.first.date.month;
+          bucketDates.first.month;
 
       if (index >= 0 && index < values.length) {
         values[index] += transaction.amount;
@@ -920,27 +977,24 @@ class _SpendingChart extends StatelessWidget {
           (current, value) => math.max(current, value).toDouble(),
     );
 
-    final visibleCount =
-    period == _AnalyticsPeriod.thisMonth ? 15 : 12;
+    const countToShow = 12;
 
-    final startIndex = buckets.length > visibleCount
-        ? period == _AnalyticsPeriod.thisMonth
-        ? (now.day - visibleCount ~/ 2)
-        .clamp(0, buckets.length - visibleCount)
-        : buckets.length - visibleCount
+    final startIndex = bucketDates.length > countToShow
+        ? period == _AnalyticsPeriod.month
+        ? (now.day - countToShow ~/ 2)
+        .clamp(0, bucketDates.length - countToShow)
+        : bucketDates.length - countToShow
         : 0;
 
-    final shownBuckets =
-    buckets.skip(startIndex).take(visibleCount).toList();
-
-    final shownValues =
-    values.skip(startIndex).take(visibleCount).toList();
+    final shownLabels = labels.skip(startIndex).take(countToShow).toList();
+    final shownValues = values.skip(startIndex).take(countToShow).toList();
+    final shownDates =
+    bucketDates.skip(startIndex).take(countToShow).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
               child: Text(
@@ -952,13 +1006,8 @@ class _SpendingChart extends StatelessWidget {
               ),
             ),
             Text(
-              period == _AnalyticsPeriod.thisMonth
-                  ? 'Peak day'
-                  : 'Peak month',
-              style: TextStyle(
-                color: muted,
-                fontSize: 12,
-              ),
+              period == _AnalyticsPeriod.month ? 'Peak day' : 'Peak month',
+              style: TextStyle(color: muted, fontSize: 12),
             ),
           ],
         ),
@@ -967,16 +1016,16 @@ class _SpendingChart extends StatelessWidget {
           height: 142,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: List.generate(shownBuckets.length, (index) {
+            children: List.generate(shownDates.length, (index) {
+              final date = shownDates[index];
               final value = shownValues[index];
-              final ratio = highest <= 0 ? 0.0 : value / highest;
-              final bucketDate = shownBuckets[index].date;
+              final ratio = highest == 0 ? 0.0 : value / highest;
 
-              final isCurrent =
-              period == _AnalyticsPeriod.thisMonth
-                  ? bucketDate.day == now.day
-                  : bucketDate.year == now.year &&
-                  bucketDate.month == now.month;
+              final isCurrent = period == _AnalyticsPeriod.month
+                  ? date.year == now.year &&
+                  date.month == now.month &&
+                  date.day == now.day
+                  : date.year == now.year && date.month == now.month;
 
               return Expanded(
                 child: Padding(
@@ -992,7 +1041,7 @@ class _SpendingChart extends StatelessWidget {
                                 ? 4
                                 : math.max(7, 94 * ratio).toDouble(),
                             decoration: BoxDecoration(
-                              color: isCurrent ? emerald : mint,
+                              color: isCurrent ? primary : mint,
                               borderRadius: BorderRadius.circular(7),
                             ),
                           ),
@@ -1000,11 +1049,9 @@ class _SpendingChart extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        period == _AnalyticsPeriod.thisMonth
-                            ? shownBuckets[index].label
-                            : _month(bucketDate.month),
+                        shownLabels[index],
                         style: TextStyle(
-                          color: isCurrent ? emerald : muted,
+                          color: isCurrent ? primary : muted,
                           fontSize: 9,
                           fontWeight: isCurrent
                               ? FontWeight.w800
@@ -1022,34 +1069,8 @@ class _SpendingChart extends StatelessWidget {
     );
   }
 
-  String _money(double amount) {
-    final formatted = amount.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ',',
-    );
-
-    return '\$$formatted';
-  }
-
   String _month(int month) => const [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ][month - 1];
-}
-
-class _ChartBucket {
-  const _ChartBucket(this.label, this.date);
-
-  final String label;
-  final DateTime date;
 }

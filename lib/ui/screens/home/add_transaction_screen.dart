@@ -1,6 +1,4 @@
 
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,11 +8,15 @@ import '../../blocs/transaction/transaction_cubit.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final TransactionType initialType;
+  final ExpenseTransaction? transaction;
 
   const AddTransactionScreen({
     super.key,
     this.initialType = TransactionType.expense,
+    this.transaction,
   });
+
+  bool get isEditing => transaction != null;
 
   @override
   State<AddTransactionScreen> createState() =>
@@ -27,8 +29,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _noteController = TextEditingController();
 
   late TransactionType _type;
+  late DateTime _date;
 
-  DateTime _date = DateTime.now();
   bool _saving = false;
   bool _loadingCategories = true;
 
@@ -74,27 +76,59 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
-    _type = widget.initialType;
-    _category = _type == TransactionType.income
-        ? _incomeCategories.first
-        : _expenseCategories.first;
+
+    final existing = widget.transaction;
+
+    _type = existing?.type ?? widget.initialType;
+    _date = existing?.date ?? DateTime.now();
+    _category = existing?.category;
+
+    if (existing != null) {
+      _amountController.text = existing.amount.toString();
+      _noteController.text = existing.note;
+    }
+
     _loadCategories();
   }
 
   Future<void> _loadCategories() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _customIncomeCategories =
-          prefs.getStringList(_incomeKey) ?? [];
-      _customExpenseCategories =
-          prefs.getStringList(_expenseKey) ?? [];
+      setState(() {
+        _customIncomeCategories =
+            prefs.getStringList(_incomeKey) ?? [];
+        _customExpenseCategories =
+            prefs.getStringList(_expenseKey) ?? [];
 
-      _category = _categories.first;
-      _loadingCategories = false;
-    });
+        _category ??= _categories.first;
+
+        // Keep an existing category even if it is no longer
+        // in the default or custom category lists.
+        if (!_categories.contains(_category)) {
+          if (_type == TransactionType.income) {
+            _customIncomeCategories.add(_category!);
+          } else {
+            _customExpenseCategories.add(_category!);
+          }
+        }
+
+        _loadingCategories = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _category ??= _categories.first;
+        _loadingCategories = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load categories: $error')),
+      );
+    }
   }
 
   Future<void> _persistCategories() async {
@@ -110,7 +144,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _customExpenseCategories,
     );
   }
-
 
   Future<void> _addCategory() async {
     String enteredName = '';
@@ -129,9 +162,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               hintText: 'e.g. Freelance or Pet Care',
               border: OutlineInputBorder(),
             ),
-            onChanged: (value) {
-              enteredName = value;
-            },
+            onChanged: (value) => enteredName = value,
             onSubmitted: (value) {
               final name = value.trim();
               if (name.isNotEmpty) {
@@ -147,10 +178,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             FilledButton.icon(
               onPressed: () {
                 final name = enteredName.trim();
-
-                if (name.isEmpty) return;
-
-                Navigator.pop(dialogContext, name);
+                if (name.isNotEmpty) {
+                  Navigator.pop(dialogContext, name);
+                }
               },
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Add'),
@@ -163,12 +193,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (!mounted || newCategory == null) return;
 
     final name = newCategory.trim();
-
     if (name.isEmpty) return;
 
     final duplicate = _categories.any(
-          (category) =>
-      category.toLowerCase() == name.toLowerCase(),
+          (category) => category.toLowerCase() == name.toLowerCase(),
     );
 
     if (duplicate) {
@@ -242,39 +270,59 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _saveTransaction() async {
-    if (_loadingCategories) return;
+    if (_loadingCategories || _saving) return;
     if (!_formKey.currentState!.validate()) return;
+
+    final category = _category;
+    if (category == null) return;
 
     setState(() => _saving = true);
 
     try {
-      final transaction = ExpenseTransaction(
+      final existing = widget.transaction;
+
+      final updatedTransaction = ExpenseTransaction(
+        id: existing?.id ?? '',
         type: _type,
         amount: double.parse(_amountController.text.trim()),
-        category: _category!,
+        category: category,
         date: _date,
         note: _noteController.text.trim(),
       );
 
-      await context
-          .read<TransactionCubit>()
-          .addTransaction(transaction);
+      final cubit = context.read<TransactionCubit>();
+
+      if (existing != null) {
+        await cubit.updateTransaction(
+          existing.id,
+          updatedTransaction,
+        );
+      } else {
+        await cubit.addTransaction(updatedTransaction);
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaction saved successfully.'),
+        SnackBar(
+          content: Text(
+            existing != null
+                ? 'Transaction updated successfully.'
+                : 'Transaction saved successfully.',
+          ),
         ),
       );
 
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not save transaction: $error'),
+          content: Text(
+            'Could not ${widget.isEditing ? 'update' : 'save'} '
+                'transaction: $error',
+          ),
         ),
       );
     } finally {
@@ -282,6 +330,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         setState(() => _saving = false);
       }
     }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 
   @override
@@ -292,7 +346,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Transaction'),
+        title: Text(
+          widget.isEditing ? 'Edit Transaction' : 'Add Transaction',
+        ),
       ),
       body: SafeArea(
         child: Form(
@@ -317,7 +373,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 onSelectionChanged: (values) {
                   setState(() {
                     _type = values.first;
-                    _category = _categories.first;
+
+                    if (!_categories.contains(_category)) {
+                      _category = _categories.first;
+                    }
                   });
                 },
               ),
@@ -334,8 +393,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  final amount =
-                  double.tryParse(value?.trim() ?? '');
+                  final amount = double.tryParse(value?.trim() ?? '');
 
                   if (amount == null ||
                       !amount.isFinite ||
@@ -356,9 +414,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     ),
                   ),
                   TextButton.icon(
-                    onPressed:
-                    _loadingCategories ? null : _addCategory,
-                    icon: const Icon(Icons.add_circle_outline, size: 19),
+                    onPressed: _loadingCategories ? null : _addCategory,
+                    icon: const Icon(
+                      Icons.add_circle_outline,
+                      size: 19,
+                    ),
                     label: const Text('Add Category'),
                   ),
                 ],
@@ -373,7 +433,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 )
               else
                 DropdownButtonFormField<String>(
-                  value: _categories.contains(_category)
+                  key: ValueKey('$_type-$_category'),
+                  initialValue: _categories.contains(_category)
                       ? _category
                       : _categories.first,
                   isExpanded: true,
@@ -392,8 +453,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       setState(() => _category = value);
                     }
                   },
-                  validator: (value) =>
-                  value == null ? 'Please select a category.' : null,
+                  validator: (value) => value == null
+                      ? 'Please select a category.'
+                      : null,
                 ),
               const SizedBox(height: 22),
               Text('Date', style: theme.textTheme.titleMedium),
@@ -401,11 +463,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               OutlinedButton.icon(
                 onPressed: _pickDate,
                 icon: const Icon(Icons.calendar_month_rounded),
-                label: Text(
-                  '${_date.day.toString().padLeft(2, '0')}/'
-                      '${_date.month.toString().padLeft(2, '0')}/'
-                      '${_date.year}',
-                ),
+                label: Text(_formatDate(_date)),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
                 ),
@@ -443,6 +501,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   label: Text(
                     _saving
                         ? 'Saving...'
+                        : widget.isEditing
+                        ? 'Update Transaction'
                         : 'Save ${isIncome ? 'Income' : 'Expense'}',
                   ),
                   style: FilledButton.styleFrom(

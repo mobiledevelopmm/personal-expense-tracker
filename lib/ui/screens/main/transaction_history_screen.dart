@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../models/transaction.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
 import '../../blocs/transaction/transaction_state.dart';
+import '../home/add_transaction_screen.dart';
 
 class TransactionHistoryScreen extends StatelessWidget {
   const TransactionHistoryScreen({super.key});
@@ -19,6 +20,86 @@ class TransactionHistoryScreen extends StatelessWidget {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  Future<void> _editTransaction(
+      BuildContext context,
+      ExpenseTransaction transaction,
+      ) async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionScreen(
+          transaction: transaction,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteTransaction(
+      BuildContext context,
+      ExpenseTransaction transaction,
+      ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
+
+        return AlertDialog(
+          icon: const Icon(
+            Icons.delete_outline_rounded,
+            color: _expense,
+            size: 34,
+          ),
+          title: const Text('Delete Transaction?'),
+          content: Text(
+            'Are you sure you want to delete this '
+                '${transaction.type.name} transaction of '
+                '${_money(transaction.amount)}?\n\n'
+                'This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
+              ),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await context
+          .read<TransactionCubit>()
+          .deleteTransaction(transaction.id);
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transaction deleted successfully.'),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not delete transaction: $error'),
+        ),
+      );
+    }
   }
 
   @override
@@ -73,11 +154,12 @@ class TransactionHistoryScreen extends StatelessWidget {
                         color: _expense,
                       ),
                       const SizedBox(height: 12),
-                      const Text('Could not load transaction history'),
+                      const Text(
+                        'Could not load transaction history',
+                      ),
                       const SizedBox(height: 8),
                       Text(
-                        state.errorMessage ??
-                            'Please try again.',
+                        state.errorMessage ?? 'Please try again.',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
@@ -214,6 +296,14 @@ class TransactionHistoryScreen extends StatelessWidget {
                           transaction: transactions[i],
                           money: _money,
                           formatDate: _formatDate,
+                          onEdit: () => _editTransaction(
+                            context,
+                            transactions[i],
+                          ),
+                          onDelete: () => _deleteTransaction(
+                            context,
+                            transactions[i],
+                          ),
                         ),
                         if (i < transactions.length - 1)
                           Divider(
@@ -281,27 +371,31 @@ class _TransactionTile extends StatelessWidget {
     required this.transaction,
     required this.money,
     required this.formatDate,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   final ExpenseTransaction transaction;
   final String Function(double) money;
   final String Function(DateTime) formatDate;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isIncome = transaction.type == TransactionType.income;
-    final color = isIncome
-        ? const Color(0xFF168568)
-        : const Color(0xFFC45B58);
+    final color = isIncome ? _TransactionHistoryScreenColors.income : _TransactionHistoryScreenColors.expense;
     final background = isIncome
         ? const Color(0xFFE3F3EB)
         : const Color(0xFFFAECEA);
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 5,
+      contentPadding: const EdgeInsets.only(
+        left: 15,
+        right: 4,
+        top: 5,
+        bottom: 5,
       ),
       leading: Container(
         width: 44,
@@ -338,14 +432,67 @@ class _TransactionTile extends StatelessWidget {
           ),
         ),
       ),
-      trailing: Text(
-        '${isIncome ? '+' : '-'}${money(transaction.amount)}',
-        style: TextStyle(
-          color: color,
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${isIncome ? '+' : '-'}${money(transaction.amount)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Transaction options',
+            icon: Icon(
+              Icons.more_vert_rounded,
+              color: colors.onSurfaceVariant,
+            ),
+            onSelected: (value) {
+              if (value == 'edit') {
+                onEdit();
+              } else if (value == 'delete') {
+                onDelete();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 20),
+                    SizedBox(width: 10),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      size: 20,
+                      color: colors.error,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Delete',
+                      style: TextStyle(color: colors.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
+
+abstract final class _TransactionHistoryScreenColors {
+  static const Color income = Color(0xFF168568);
+  static const Color expense = Color(0xFFC45B58);
 }

@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -44,21 +45,44 @@ class TransactionService {
     );
   }
 
-
-  Future<void> addTransaction(ExpenseTransaction transaction) async {
+  Future<void> addTransaction(
+      ExpenseTransaction transaction,
+      ) async {
     try {
-      final collection = _userTransactions();
-
-      await collection
+      await _userTransactions()
           .add(transaction.toMap())
           .timeout(const Duration(seconds: 15));
     } on FirebaseException catch (error) {
       throw Exception(
-        'Firestore error (${error.code}): ${error.message ?? 'Unknown error'}',
+        'Firestore error (${error.code}): '
+            '${error.message ?? 'Unknown error'}',
       );
     } on TimeoutException {
       throw Exception(
-        'Saving timed out. Please check your internet connection and Firebase settings.',
+        'Saving timed out. Please check your internet connection '
+            'and Firebase settings.',
+      );
+    }
+  }
+
+  Future<void> updateTransaction(
+      String id,
+      ExpenseTransaction transaction,
+      ) async {
+    try {
+      await _userTransactions()
+          .doc(id)
+          .update(transaction.toMap())
+          .timeout(const Duration(seconds: 15));
+    } on FirebaseException catch (error) {
+      throw Exception(
+        'Firestore error (${error.code}): '
+            '${error.message ?? 'Unknown error'}',
+      );
+    } on TimeoutException {
+      throw Exception(
+        'Updating timed out. Please check your internet connection '
+            'and Firebase settings.',
       );
     }
   }

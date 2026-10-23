@@ -67,6 +67,21 @@ class TransactionCubit extends Cubit<TransactionState> {
     }
   }
 
+  Future<void> updateTransaction(
+      String id,
+      ExpenseTransaction transaction,
+      ) async {
+    try {
+      await _service.updateTransaction(id, transaction);
+    } catch (error) {
+      emit(state.copyWith(
+        status: TransactionStatus.failure,
+        errorMessage: error.toString(),
+      ));
+      rethrow;
+    }
+  }
+
   @override
   Future<void> close() {
     _subscription?.cancel();
