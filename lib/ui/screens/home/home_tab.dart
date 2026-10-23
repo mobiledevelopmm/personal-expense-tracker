@@ -4,8 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../models/transaction.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
 import '../../blocs/transaction/transaction_state.dart';
-import '../main/transaction_history_screen.dart';
-import 'add_transaction_screen.dart';
+import '../transaction/transaction_history_screen.dart';
+import '../transaction/add_transaction_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});

@@ -2,12 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../data/services/transaction_service.dart';
-import '../../blocs/transaction/transaction_cubit.dart';
-import '../main/analytics_screen.dart';
-import 'home_tab.dart';
-import 'analytics_tab.dart';
-import 'profile_tab.dart';
+import '../../data/services/transaction_service.dart';
+import '../blocs/transaction/transaction_cubit.dart';
+import 'home/analytics_screen.dart';
+import 'home/home_tab.dart';
+import 'home/profile_tab.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

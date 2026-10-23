@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../models/transaction.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
 import '../../blocs/transaction/transaction_state.dart';
-import '../home/add_transaction_screen.dart';
+import 'add_transaction_screen.dart';
 
 class TransactionHistoryScreen extends StatelessWidget {
   const TransactionHistoryScreen({super.key});

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../main.dart';
-import 'auth/auth_cubit.dart';
+import '../../../main.dart';
+import '../../blocs/auth/auth_cubit.dart';
+import '../../design_system/theme.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
