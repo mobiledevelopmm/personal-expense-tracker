@@ -70,7 +70,7 @@ class _HomeTabState extends State<HomeTab> {
     final parts = fixedAmount.split('.');
     final wholeNumber = parts[0].replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (match) => ',',
+          (match) => ',',
     );
     final sign = amount < 0 ? '-' : '';
 
@@ -217,9 +217,9 @@ class _HomeTabState extends State<HomeTab> {
                       transactions.isEmpty)
                     _buildError(state.errorMessage)
                   else if (transactions.isEmpty)
-                    _buildEmptyTransactions()
-                  else
-                    _buildRecentTransactions(transactions),
+                      _buildEmptyTransactions()
+                    else
+                      _buildRecentTransactions(transactions),
                 ],
               ),
             );
@@ -613,9 +613,9 @@ class _HomeTabState extends State<HomeTab> {
                   flex: income + expenses <= 0
                       ? 1
                       : (income / (income + expenses) * 1000).round().clamp(
-                          1,
-                          1000,
-                        ),
+                    1,
+                    1000,
+                  ),
                   child: Container(
                     decoration: BoxDecoration(
                       color: _income,
@@ -628,9 +628,9 @@ class _HomeTabState extends State<HomeTab> {
                     flex: income + expenses <= 0
                         ? 1
                         : (expenses / (income + expenses) * 1000).round().clamp(
-                            1,
-                            1000,
-                          ),
+                      1,
+                      1000,
+                    ),
                     child: Container(
                       decoration: BoxDecoration(
                         color: _expense,

@@ -57,17 +57,17 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.navy,
+          backgroundColor: Theme.of(context).colorScheme.inverseSurface,
         ),
       );
     } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Something went wrong. Please try again.'),
+        SnackBar(
+          content: const Text('Something went wrong. Please try again.'),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.navy,
+          backgroundColor: Theme.of(context).colorScheme.inverseSurface,
         ),
       );
     } finally {
@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final size = MediaQuery.sizeOf(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -101,15 +101,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 86,
                         height: 86,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
+                          gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [AppColors.navy, AppColors.emerald],
+                            colors: const [AppColors.navy, AppColors.emerald],
                           ),
                           borderRadius: BorderRadius.circular(27),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.emerald.withValues(alpha: 0.18),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.18),
                               blurRadius: 24,
                               offset: const Offset(0, 10),
                             ),
@@ -129,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       'PERSONAL FINANCE',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: AppColors.emeraldDark,
+                        color: theme.colorScheme.primary,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 2.2,
                       ),
@@ -161,12 +161,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     Container(
                       padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: theme.colorScheme.surface,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: theme.colorScheme.outline),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.navy.withValues(alpha: 0.045),
+                            color: theme.colorScheme.inverseSurface.withValues(alpha: 0.045),
                             blurRadius: 28,
                             offset: const Offset(0, 10),
                           ),
@@ -264,40 +264,40 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: FilledButton(
                               onPressed: _loading ? null : _login,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.emerald,
+                                backgroundColor: theme.colorScheme.primary,
                                 foregroundColor: Colors.white,
-                                disabledBackgroundColor: AppColors.border,
+                                disabledBackgroundColor: theme.colorScheme.outline,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                               ),
                               child: _loading
                                   ? const SizedBox(
-                                      width: 23,
-                                      height: 23,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: Colors.white,
-                                      ),
-                                    )
+                                width: 23,
+                                height: 23,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
                                   : const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          'Sign In',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        SizedBox(width: 10),
-                                        Icon(
-                                          Icons.arrow_forward_rounded,
-                                          size: 20,
-                                        ),
-                                      ],
+                                mainAxisAlignment:
+                                MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Sign In',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
                                     ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -319,18 +319,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: _loading
                               ? null
                               : () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const RegisterScreen(),
-                                    ),
-                                  );
-                                },
-                          child: const Text(
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: Text(
                             'Create account',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
-                              color: AppColors.emeraldDark,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                         ),
@@ -339,20 +339,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 8),
 
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.lock_outline_rounded,
                           size: 14,
-                          color: AppColors.textSecondary,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
                           'Your financial journey starts here',
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
