@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../models/transaction.dart';
+import '../../../data/services/notification_service.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
+import '../notification/notification_cubit.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final TransactionType initialType;
@@ -126,7 +128,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load categories: $error')),
+        SnackBar(
+          content: Text('Could not load categories: $error'),
+        ),
       );
     }
   }
@@ -165,6 +169,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             onChanged: (value) => enteredName = value,
             onSubmitted: (value) {
               final name = value.trim();
+
               if (name.isNotEmpty) {
                 Navigator.pop(dialogContext, name);
               }
@@ -178,6 +183,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             FilledButton.icon(
               onPressed: () {
                 final name = enteredName.trim();
+
                 if (name.isNotEmpty) {
                   Navigator.pop(dialogContext, name);
                 }
@@ -298,20 +304,41 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           updatedTransaction,
         );
       } else {
+        // Save the new transaction first.
         await cubit.addTransaction(updatedTransaction);
+
+        if (!mounted) return;
+
+        final isIncome = _type == TransactionType.income;
+        final title = isIncome ? 'Income Added' : 'Expense Added';
+        final message =
+            '${isIncome ? 'Income' : 'Expense'} of '
+            '\$${updatedTransaction.amount.toStringAsFixed(2)} '
+            'in $category was saved successfully.';
+
+        // Add a notification inside the app.
+        try {
+          await context.read<NotificationCubit>().addNotification(
+            title: title,
+            message: message,
+          );
+        } catch (error) {
+          debugPrint('In-app notification error: $error');
+        }
+
+        // Also show a notification in the phone notification bar.
+        try {
+          await NotificationService.instance.showTransactionNotification(
+            id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            title: title,
+            body: message,
+          );
+        } catch (error) {
+          debugPrint('Phone notification error: $error');
+        }
       }
 
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            existing != null
-                ? 'Transaction updated successfully.'
-                : 'Transaction saved successfully.',
-          ),
-        ),
-      );
 
       Navigator.pop(context, true);
     } catch (error) {

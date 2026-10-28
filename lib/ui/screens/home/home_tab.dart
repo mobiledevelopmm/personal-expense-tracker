@@ -6,6 +6,7 @@ import '../../blocs/transaction/transaction_cubit.dart';
 import '../../blocs/transaction/transaction_state.dart';
 import '../transaction/transaction_history_screen.dart';
 import '../transaction/add_transaction_screen.dart';
+import '../notification/notification_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -145,8 +146,11 @@ class _HomeTabState extends State<HomeTab> {
             child: IconButton(
               tooltip: 'Notifications',
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notifications coming soon.')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationScreen(),
+                  ),
                 );
               },
               icon: const Icon(Icons.notifications_none_rounded, size: 22),

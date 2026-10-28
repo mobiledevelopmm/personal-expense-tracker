@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:personal_expense_tracker/ui/blocs/transaction/transaction_cubit.dart';
 import 'package:personal_expense_tracker/ui/design_system/theme.dart';
+import 'package:personal_expense_tracker/ui/screens/notification/notification_cubit.dart';
 
+import 'data/services/notification_service.dart';
 import 'data/services/transaction_service.dart';
 import 'firebase_options.dart';
 import 'ui/blocs/auth/auth_cubit.dart';
@@ -16,6 +18,8 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await NotificationService.instance.initialize();
 
   runApp(const MyApp());
 }
@@ -35,6 +39,9 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider<TransactionCubit>(
           create: (_) => TransactionCubit(TransactionService()),
+        ),
+        BlocProvider<NotificationCubit>(
+          create: (_) => NotificationCubit(),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
