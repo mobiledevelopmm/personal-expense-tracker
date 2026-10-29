@@ -1,3 +1,5 @@
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthService {
@@ -11,7 +13,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return await _auth.signInWithEmailAndPassword(
+    return _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
@@ -22,18 +24,35 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final displayName = name.trim();
+    final userEmail = email.trim();
+
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: userEmail,
       password: password,
     );
 
-    await credential.user?.updateDisplayName(name.trim());
-    await credential.user?.reload();
+    final user = credential.user;
+
+    if (user != null) {
+      await user.updateDisplayName(displayName);
+      await user.reload();
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'name': displayName,
+        'email': userEmail,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
 
     return credential;
   }
 
   Future<void> logout() async {
-    await FirebaseAuth.instance.signOut();
+    await _auth.signOut();
   }
 }

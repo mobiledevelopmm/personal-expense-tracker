@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,8 +20,7 @@ class AddTransactionScreen extends StatefulWidget {
   bool get isEditing => transaction != null;
 
   @override
-  State<AddTransactionScreen> createState() =>
-      _AddTransactionScreenState();
+  State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
@@ -100,10 +98,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!mounted) return;
 
       setState(() {
-        _customIncomeCategories =
-            prefs.getStringList(_incomeKey) ?? [];
-        _customExpenseCategories =
-            prefs.getStringList(_expenseKey) ?? [];
+        _customIncomeCategories = prefs.getStringList(_incomeKey) ?? [];
+        _customExpenseCategories = prefs.getStringList(_expenseKey) ?? [];
 
         _category ??= _categories.first;
 
@@ -128,9 +124,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not load categories: $error'),
-        ),
+        SnackBar(content: Text('Could not load categories: $error')),
       );
     }
   }
@@ -138,15 +132,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Future<void> _persistCategories() async {
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setStringList(
-      _incomeKey,
-      _customIncomeCategories,
-    );
+    await prefs.setStringList(_incomeKey, _customIncomeCategories);
 
-    await prefs.setStringList(
-      _expenseKey,
-      _customExpenseCategories,
-    );
+    await prefs.setStringList(_expenseKey, _customExpenseCategories);
   }
 
   Future<void> _addCategory() async {
@@ -202,14 +190,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (name.isEmpty) return;
 
     final duplicate = _categories.any(
-          (category) => category.toLowerCase() == name.toLowerCase(),
+      (category) => category.toLowerCase() == name.toLowerCase(),
     );
 
     if (duplicate) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This category already exists.'),
-        ),
+        const SnackBar(content: Text('This category already exists.')),
       );
       return;
     }
@@ -230,9 +216,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Category added successfully.'),
-        ),
+        const SnackBar(content: Text('Category added successfully.')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -248,9 +232,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not save category: $error'),
-        ),
+        SnackBar(content: Text('Could not save category: $error')),
       );
     }
   }
@@ -299,10 +281,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final cubit = context.read<TransactionCubit>();
 
       if (existing != null) {
-        await cubit.updateTransaction(
-          existing.id,
-          updatedTransaction,
-        );
+        await cubit.updateTransaction(existing.id, updatedTransaction);
       } else {
         // Save the new transaction first.
         await cubit.addTransaction(updatedTransaction);
@@ -348,7 +327,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         SnackBar(
           content: Text(
             'Could not ${widget.isEditing ? 'update' : 'save'} '
-                'transaction: $error',
+            'transaction: $error',
           ),
         ),
       );
@@ -373,9 +352,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.isEditing ? 'Edit Transaction' : 'Add Transaction',
-        ),
+        title: Text(widget.isEditing ? 'Edit Transaction' : 'Add Transaction'),
       ),
       body: SafeArea(
         child: Form(
@@ -412,8 +389,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: _amountController,
-                keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(
                   prefixText: '\$ ',
                   hintText: '0.00',
@@ -422,9 +400,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 validator: (value) {
                   final amount = double.tryParse(value?.trim() ?? '');
 
-                  if (amount == null ||
-                      !amount.isFinite ||
-                      amount <= 0) {
+                  if (amount == null || !amount.isFinite || amount <= 0) {
                     return 'Enter a valid amount greater than zero.';
                   }
 
@@ -435,17 +411,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Category',
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    child: Text('Category', style: theme.textTheme.titleMedium),
                   ),
                   TextButton.icon(
                     onPressed: _loadingCategories ? null : _addCategory,
-                    icon: const Icon(
-                      Icons.add_circle_outline,
-                      size: 19,
-                    ),
+                    icon: const Icon(Icons.add_circle_outline, size: 19),
                     label: const Text('Add Category'),
                   ),
                 ],
@@ -480,9 +450,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       setState(() => _category = value);
                     }
                   },
-                  validator: (value) => value == null
-                      ? 'Please select a category.'
-                      : null,
+                  validator: (value) =>
+                      value == null ? 'Please select a category.' : null,
                 ),
               const SizedBox(height: 22),
               Text('Date', style: theme.textTheme.titleMedium),
@@ -496,10 +465,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 ),
               ),
               const SizedBox(height: 22),
-              Text(
-                'Note (Optional)',
-                style: theme.textTheme.titleMedium,
-              ),
+              Text('Note (Optional)', style: theme.textTheme.titleMedium),
               const SizedBox(height: 10),
               TextFormField(
                 controller: _noteController,
@@ -518,12 +484,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       : _saveTransaction,
                   icon: _saving
                       ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.check_rounded),
                   label: Text(
                     _saving

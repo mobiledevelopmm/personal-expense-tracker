@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,8 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _isDark = false;
   bool _isUploadingPhoto = false;
   bool _isSavingProfile = false;
+  String? _savedName;
+  bool _isLoadingProfileName = true;
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -36,6 +39,43 @@ class _ProfileTabState extends State<ProfileTab> {
   void initState() {
     super.initState();
     _loadNotificationPreferences();
+    _loadProfileName();
+  }
+
+  Future<void> _loadProfileName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoadingProfileName = false);
+      return;
+    }
+
+    try {
+      // Read Firestore first because it is the app's saved profile source.
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final firestoreName = (doc.data()?['name'] as String?)?.trim() ?? '';
+
+      // Refresh Firebase Auth as a fallback if Firestore has no name.
+      if (firestoreName.isEmpty) {
+        await user.reload();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _savedName = firestoreName.isNotEmpty
+            ? firestoreName
+            : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
+            ? FirebaseAuth.instance.currentUser!.displayName!.trim()
+            : null);
+        _isLoadingProfileName = false;
+      });
+    } catch (error) {
+      debugPrint('Could not load profile name: $error');
+      if (!mounted) return;
+      setState(() => _isLoadingProfileName = false);
+    }
   }
 
   Future<void> _loadNotificationPreferences() async {
@@ -259,10 +299,10 @@ class _ProfileTabState extends State<ProfileTab> {
               onPressed: _isSavingProfile ? null : _editProfile,
               icon: _isSavingProfile
                   ? const SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                width: 17,
+                height: 17,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
                   : const Icon(Icons.edit_outlined, size: 18),
               label: Text(_isSavingProfile ? 'Saving...' : 'Edit Profile'),
               style: OutlinedButton.styleFrom(
@@ -343,25 +383,25 @@ class _ProfileTabState extends State<ProfileTab> {
               clipBehavior: Clip.antiAlias,
               child: _isUploadingPhoto
                   ? const Center(
-                      child: SizedBox(
-                        width: 27,
-                        height: 27,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 3,
-                        ),
-                      ),
-                    )
+                child: SizedBox(
+                  width: 27,
+                  height: 27,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                ),
+              )
                   : photoUrl != null && photoUrl.isNotEmpty
                   ? Image.network(
-                      photoUrl,
-                      fit: BoxFit.cover,
-                      width: 76,
-                      height: 76,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _initialsAvatar(initials);
-                      },
-                    )
+                photoUrl,
+                fit: BoxFit.cover,
+                width: 76,
+                height: 76,
+                errorBuilder: (context, error, stackTrace) {
+                  return _initialsAvatar(initials);
+                },
+              )
                   : _initialsAvatar(initials),
             ),
 
@@ -475,7 +515,7 @@ class _ProfileTabState extends State<ProfileTab> {
           break;
         default:
           message =
-              'Upload failed (${error.code}): ${error.message ?? 'Please try again.'}';
+          'Upload failed (${error.code}): ${error.message ?? 'Please try again.'}';
       }
       _showMessage(message);
     } catch (error) {
@@ -489,29 +529,35 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   // Edit display name
+
   Future<void> _editProfile() async {
-    final user = _currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       _showMessage('Please sign in again.');
       return;
     }
 
-    // The dialog owns its TextEditingController and disposes it safely
-    // when the dialog widget is removed from the widget tree.
     final newName = await showDialog<String>(
       context: context,
       builder: (_) => _EditProfileDialog(
-        initialName: user.displayName ?? '',
+        initialName: _savedName ?? user.displayName ?? '',
         surfaceColor: _surfaceColor,
         primaryText: _primaryText,
         pageColor: _pageColor,
       ),
     );
 
-    if (newName == null || !mounted) return; // User pressed Cancel.
+    if (newName == null || !mounted) return;
 
-    if (newName.trim() == (user.displayName ?? '').trim()) {
+    final updatedName = newName.trim();
+
+    if (updatedName.isEmpty) {
+      _showMessage('Please enter your name.');
+      return;
+    }
+
+    if (updatedName == (user.displayName ?? '').trim()) {
       _showMessage('No changes were made.');
       return;
     }
@@ -519,17 +565,38 @@ class _ProfileTabState extends State<ProfileTab> {
     setState(() => _isSavingProfile = true);
 
     try {
-      await user.updateDisplayName(newName.trim());
-      await user.reload();
+      // Update Firebase Authentication.
+      await user.updateDisplayName(updatedName);
+
+      // Update Firestore without deleting existing fields.
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'name': updatedName,
+        'email': user.email,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await FirebaseAuth.instance.currentUser?.reload();
 
       if (!mounted) return;
 
-      setState(() {});
+      setState(() {
+        _savedName = updatedName;
+      });
       _showMessage('Profile updated successfully.');
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
-      _showMessage('Could not update profile: ${error.message ?? error.code}');
-    } catch (_) {
+      _showMessage(
+        'Could not update profile: ${error.message ?? error.code}',
+      );
+    } on FirebaseException catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        'Firestore error: ${error.message ?? error.code}',
+      );
+    } catch (error) {
       if (!mounted) return;
       _showMessage('Could not update profile. Please try again.');
     } finally {
@@ -540,17 +607,17 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   String _displayName(User? user) {
-    final displayName = user?.displayName?.trim() ?? '';
+    final savedName = _savedName?.trim() ?? '';
+    if (savedName.isNotEmpty) return savedName;
 
-    if (displayName.isNotEmpty) {
-      return displayName;
-    }
+    // Avoid briefly showing the email prefix while the saved name loads.
+    if (_isLoadingProfileName) return 'Loading...';
 
-    final email = user?.email ?? '';
+    final authName = user?.displayName?.trim() ?? '';
+    if (authName.isNotEmpty) return authName;
 
-    if (email.isNotEmpty && email.contains('@')) {
-      return email.split('@').first;
-    }
+    final emailName = user?.email?.split('@').first.trim() ?? '';
+    if (emailName.isNotEmpty) return emailName;
 
     return 'User';
   }
@@ -569,7 +636,7 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     return '${parts.first.characters.first}'
-            '${parts.last.characters.first}'
+        '${parts.last.characters.first}'
         .toUpperCase();
   }
 
@@ -759,7 +826,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                      'Phone Notifications',
+                      'Device Notifications',
                       style: TextStyle(color: _primaryText),
                     ),
                     subtitle: Text(
@@ -876,9 +943,9 @@ class _ProfileTabState extends State<ProfileTab> {
               onPressed: email.isEmpty
                   ? null
                   : () {
-                      Navigator.pop(dialogContext);
-                      _sendPasswordReset(email);
-                    },
+                Navigator.pop(dialogContext);
+                _sendPasswordReset(email);
+              },
               child: const Text('Reset Password'),
             ),
           ],

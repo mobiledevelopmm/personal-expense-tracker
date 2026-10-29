@@ -16,17 +16,36 @@ class TransactionService {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance;
 
-  CollectionReference<Map<String, dynamic>> _userTransactions() {
+  User _requireUser() {
     final user = _auth.currentUser;
-
     if (user == null) {
       throw StateError('Please log in to access transactions.');
     }
+    return user;
+  }
 
-    return _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('transactions');
+  DocumentReference<Map<String, dynamic>> _userDocument(User user) =>
+      _firestore.collection('users').doc(user.uid);
+
+  CollectionReference<Map<String, dynamic>> _userTransactions() {
+    final user = _requireUser();
+    return _userDocument(user).collection('transactions');
+  }
+
+  // Make sure the parent users/{uid} document exists before saving a transaction.
+  // Existing fields are preserved; this only creates the document if it is missing.
+  Future<void> _ensureUserDocument(User user) async {
+    final userDoc = _userDocument(user);
+    final snapshot = await userDoc.get();
+
+    if (!snapshot.exists) {
+      await userDoc.set({
+        'name': user.displayName ?? '',
+        'email': user.email ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
   }
 
   Stream<List<ExpenseTransaction>> watchTransactions() {
@@ -49,6 +68,8 @@ class TransactionService {
       ExpenseTransaction transaction,
       ) async {
     try {
+      final user = _requireUser();
+      await _ensureUserDocument(user);
       await _userTransactions()
           .add(transaction.toMap())
           .timeout(const Duration(seconds: 15));
