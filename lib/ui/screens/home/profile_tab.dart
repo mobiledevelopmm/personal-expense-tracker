@@ -1,4 +1,3 @@
-
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../blocs/auth/auth_cubit.dart';
 import '../../blocs/theme/theme_cubit.dart';
@@ -23,6 +23,9 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _emailNotifications = true;
   bool _transactionAlerts = true;
 
+  static const String _emailNotificationsKey = 'email_notifications_enabled';
+  static const String _transactionAlertsKey = 'transaction_alerts_enabled';
+
   bool _isDark = false;
   bool _isUploadingPhoto = false;
   bool _isSavingProfile = false;
@@ -32,14 +35,19 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   void initState() {
     super.initState();
-    _loadNotificationPreference();
+    _loadNotificationPreferences();
   }
 
-  Future<void> _loadNotificationPreference() async {
-    final enabled =
-    await NotificationService.instance.areNotificationsEnabled();
+  Future<void> _loadNotificationPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final phoneEnabled = await NotificationService.instance
+        .areNotificationsEnabled();
     if (!mounted) return;
-    setState(() => _notificationsEnabled = enabled);
+    setState(() {
+      _notificationsEnabled = phoneEnabled;
+      _emailNotifications = prefs.getBool(_emailNotificationsKey) ?? true;
+      _transactionAlerts = prefs.getBool(_transactionAlertsKey) ?? true;
+    });
   }
 
   static const Color _navy = Color(0xFF101D2C);
@@ -56,12 +64,9 @@ class _ProfileTabState extends State<ProfileTab> {
   Color get _pageColor => _isDark ? _navy : _background;
   Color get _surfaceColor => _isDark ? _navyLight : Colors.white;
   Color get _primaryText => _isDark ? Colors.white : _navy;
-  Color get _mutedText =>
-      _isDark ? const Color(0xFFB0BEC5) : _secondaryText;
+  Color get _mutedText => _isDark ? const Color(0xFFB0BEC5) : _secondaryText;
   Color get _lineColor => _isDark ? const Color(0xFF344957) : _border;
-  Color get _iconSurface => _isDark
-      ? const Color(0xFF294640)
-      : _lightMint;
+  Color get _iconSurface => _isDark ? const Color(0xFF294640) : _lightMint;
 
   User? get _currentUser => FirebaseAuth.instance.currentUser;
 
@@ -84,17 +89,11 @@ class _ProfileTabState extends State<ProfileTab> {
             const SizedBox(height: 26),
             _buildAccountCard(name, email),
             const SizedBox(height: 30),
-            _buildSectionHeading(
-              'Preferences',
-              'Make the app work for you',
-            ),
+            _buildSectionHeading('Preferences', 'Make the app work for you'),
             const SizedBox(height: 15),
             _buildPreferencesCard(),
             const SizedBox(height: 28),
-            _buildSectionHeading(
-              'Support',
-              'We are here to help',
-            ),
+            _buildSectionHeading('Support', 'We are here to help'),
             const SizedBox(height: 15),
             _buildSupportCard(),
             const SizedBox(height: 28),
@@ -115,10 +114,7 @@ class _ProfileTabState extends State<ProfileTab> {
             Center(
               child: Text(
                 'Your money, clearly understood.',
-                style: TextStyle(
-                  color: _mutedText,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: _mutedText, fontSize: 12),
               ),
             ),
           ],
@@ -157,26 +153,9 @@ class _ProfileTabState extends State<ProfileTab> {
               const SizedBox(height: 4),
               Text(
                 'Manage your account and preferences',
-                style: TextStyle(
-                  color: _mutedText,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: _mutedText, fontSize: 13),
               ),
             ],
-          ),
-        ),
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: _surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _lineColor),
-          ),
-          child: const Icon(
-            Icons.person_outline_rounded,
-            color: _emerald,
-            size: 24,
           ),
         ),
       ],
@@ -196,9 +175,7 @@ class _ProfileTabState extends State<ProfileTab> {
         border: Border.all(color: _lineColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: _isDark ? 0.08 : 0.025,
-            ),
+            color: Colors.black.withValues(alpha: _isDark ? 0.08 : 0.025),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -269,10 +246,7 @@ class _ProfileTabState extends State<ProfileTab> {
               _isUploadingPhoto
                   ? 'Uploading photo...'
                   : 'Tap your photo to change it',
-              style: TextStyle(
-                color: _mutedText,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: _mutedText, fontSize: 12),
             ),
           ),
 
@@ -285,19 +259,12 @@ class _ProfileTabState extends State<ProfileTab> {
               onPressed: _isSavingProfile ? null : _editProfile,
               icon: _isSavingProfile
                   ? const SizedBox(
-                width: 17,
-                height: 17,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
-              )
-                  : const Icon(
-                Icons.edit_outlined,
-                size: 18,
-              ),
-              label: Text(
-                _isSavingProfile ? 'Saving...' : 'Edit Profile',
-              ),
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.edit_outlined, size: 18),
+              label: Text(_isSavingProfile ? 'Saving...' : 'Edit Profile'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _emerald,
                 side: const BorderSide(color: _emerald),
@@ -376,25 +343,25 @@ class _ProfileTabState extends State<ProfileTab> {
               clipBehavior: Clip.antiAlias,
               child: _isUploadingPhoto
                   ? const Center(
-                child: SizedBox(
-                  width: 27,
-                  height: 27,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
-                  ),
-                ),
-              )
+                      child: SizedBox(
+                        width: 27,
+                        height: 27,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    )
                   : photoUrl != null && photoUrl.isNotEmpty
                   ? Image.network(
-                photoUrl,
-                fit: BoxFit.cover,
-                width: 76,
-                height: 76,
-                errorBuilder: (context, error, stackTrace) {
-                  return _initialsAvatar(initials);
-                },
-              )
+                      photoUrl,
+                      fit: BoxFit.cover,
+                      width: 76,
+                      height: 76,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _initialsAvatar(initials);
+                      },
+                    )
                   : _initialsAvatar(initials),
             ),
 
@@ -407,10 +374,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 decoration: BoxDecoration(
                   color: _emerald,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _surfaceColor,
-                    width: 2.5,
-                  ),
+                  border: Border.all(color: _surfaceColor, width: 2.5),
                 ),
                 child: const Icon(
                   Icons.camera_alt_rounded,
@@ -497,23 +461,21 @@ class _ProfileTabState extends State<ProfileTab> {
       String message;
       switch (error.code) {
         case 'object-not-found':
-          message =
-          'Photo was not found in Firebase Storage. Check that Firebase Storage is enabled and the upload completed.';
+          message = 'Photo was not found in Firebase Storage. Check that Firebase Storage is enabled and the upload completed.';
           break;
         case 'bucket-not-found':
-          message =
-          'Firebase Storage bucket was not found. Create/enable the Storage bucket in Firebase Console and check firebase_options.dart.';
+          message = 'Firebase Storage bucket was not found. Create/enable the Storage bucket in Firebase Console and check firebase_options.dart.';
           break;
         case 'unauthorized':
         case 'permission-denied':
-          message =
-          'Upload permission denied. Please check your Firebase Storage Rules.';
+          message = 'Upload permission denied. Please check your Firebase Storage Rules.';
           break;
         case 'canceled':
           message = 'Photo upload was cancelled. Please try again.';
           break;
         default:
-          message = 'Upload failed (${error.code}): ${error.message ?? 'Please try again.'}';
+          message =
+              'Upload failed (${error.code}): ${error.message ?? 'Please try again.'}';
       }
       _showMessage(message);
     } catch (error) {
@@ -566,14 +528,10 @@ class _ProfileTabState extends State<ProfileTab> {
       _showMessage('Profile updated successfully.');
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
-      _showMessage(
-        'Could not update profile: ${error.message ?? error.code}',
-      );
+      _showMessage('Could not update profile: ${error.message ?? error.code}');
     } catch (_) {
       if (!mounted) return;
-      _showMessage(
-        'Could not update profile. Please try again.',
-      );
+      _showMessage('Could not update profile. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _isSavingProfile = false);
@@ -611,7 +569,7 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     return '${parts.first.characters.first}'
-        '${parts.last.characters.first}'
+            '${parts.last.characters.first}'
         .toUpperCase();
   }
 
@@ -623,13 +581,7 @@ class _ProfileTabState extends State<ProfileTab> {
         color: _iconSurface,
         borderRadius: BorderRadius.circular(13),
       ),
-      child: Center(
-        child: Icon(
-          icon,
-          color: _emerald,
-          size: 21,
-        ),
-      ),
+      child: Center(child: Icon(icon, color: _emerald, size: 21)),
     );
   }
 
@@ -648,13 +600,7 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: TextStyle(
-            color: _mutedText,
-            fontSize: 13,
-          ),
-        ),
+        Text(subtitle, style: TextStyle(color: _mutedText, fontSize: 13)),
       ],
     );
   }
@@ -788,12 +734,7 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _rowDivider() {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: _lineColor,
-      indent: 53,
-    );
+    return Divider(height: 1, thickness: 1, color: _lineColor, indent: 53);
   }
 
   // Notification preferences
@@ -818,11 +759,11 @@ class _ProfileTabState extends State<ProfileTab> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                      'Device notifications',
+                      'Phone Notifications',
                       style: TextStyle(color: _primaryText),
                     ),
                     subtitle: Text(
-                      'Choose whether to receive notifications on your phone',
+                      'Choose whether to receive notifications on your phone.',
                       style: TextStyle(color: _mutedText),
                     ),
                     value: _notificationsEnabled,
@@ -837,39 +778,39 @@ class _ProfileTabState extends State<ProfileTab> {
                       setState(() {});
                     },
                   ),
-                  if (_notificationsEnabled) ...[
-                    Divider(color: _lineColor),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'Email notifications',
-                        style: TextStyle(color: _primaryText),
-                      ),
-                      value: _emailNotifications,
-                      activeTrackColor: _emerald,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _emailNotifications = value;
-                        });
-                        setState(() {});
-                      },
+                  Divider(color: _lineColor),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Email notifications',
+                      style: TextStyle(color: _primaryText),
                     ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'Transaction alerts',
-                        style: TextStyle(color: _primaryText),
-                      ),
-                      value: _transactionAlerts,
-                      activeTrackColor: _emerald,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _transactionAlerts = value;
-                        });
-                        setState(() {});
-                      },
+                    value: _emailNotifications,
+                    activeTrackColor: _emerald,
+                    onChanged: (value) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool(_emailNotificationsKey, value);
+                      if (!mounted) return;
+                      setDialogState(() => _emailNotifications = value);
+                      setState(() {});
+                    },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Transaction alerts',
+                      style: TextStyle(color: _primaryText),
                     ),
-                  ],
+                    value: _transactionAlerts,
+                    activeTrackColor: _emerald,
+                    onChanged: (value) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool(_transactionAlertsKey, value);
+                      if (!mounted) return;
+                      setDialogState(() => _transactionAlerts = value);
+                      setState(() {});
+                    },
+                  ),
                 ],
               ),
               actions: [
@@ -894,17 +835,10 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: _surfaceColor,
-          icon: const Icon(
-            Icons.shield_outlined,
-            color: _emerald,
-            size: 35,
-          ),
+          icon: const Icon(Icons.shield_outlined, color: _emerald, size: 35),
           title: Text(
             'Account Security',
-            style: TextStyle(
-              color: _primaryText,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: _primaryText, fontWeight: FontWeight.w800),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -912,10 +846,7 @@ class _ProfileTabState extends State<ProfileTab> {
             children: [
               Text(
                 'Signed-in email',
-                style: TextStyle(
-                  color: _mutedText,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: _mutedText, fontSize: 12),
               ),
               const SizedBox(height: 6),
               SelectableText(
@@ -928,10 +859,7 @@ class _ProfileTabState extends State<ProfileTab> {
               const SizedBox(height: 18),
               Text(
                 'You can request a password reset email to help protect your account.',
-                style: TextStyle(
-                  color: _mutedText,
-                  height: 1.5,
-                ),
+                style: TextStyle(color: _mutedText, height: 1.5),
               ),
             ],
           ),
@@ -948,9 +876,9 @@ class _ProfileTabState extends State<ProfileTab> {
               onPressed: email.isEmpty
                   ? null
                   : () {
-                Navigator.pop(dialogContext);
-                _sendPasswordReset(email);
-              },
+                      Navigator.pop(dialogContext);
+                      _sendPasswordReset(email);
+                    },
               child: const Text('Reset Password'),
             ),
           ],
@@ -961,15 +889,11 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Future<void> _sendPasswordReset(String email) async {
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: email,
-      );
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
       if (!mounted) return;
 
-      _showMessage(
-        'Password reset email sent. Please check your inbox.',
-      );
+      _showMessage('Password reset email sent. Please check your inbox.');
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
 
@@ -1001,10 +925,7 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
           title: Text(
             'Help & Support',
-            style: TextStyle(
-              color: _primaryText,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: _primaryText, fontWeight: FontWeight.w800),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -1071,11 +992,7 @@ class _ProfileTabState extends State<ProfileTab> {
           const SizedBox(height: 5),
           Text(
             answer,
-            style: TextStyle(
-              color: _mutedText,
-              fontSize: 12,
-              height: 1.5,
-            ),
+            style: TextStyle(color: _mutedText, fontSize: 12, height: 1.5),
           ),
         ],
       ),
@@ -1089,24 +1006,14 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: _surfaceColor,
-          icon: const Icon(
-            Icons.logout_rounded,
-            color: _danger,
-            size: 34,
-          ),
+          icon: const Icon(Icons.logout_rounded, color: _danger, size: 34),
           title: Text(
             'Log Out?',
-            style: TextStyle(
-              color: _primaryText,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: _primaryText, fontWeight: FontWeight.w800),
           ),
           content: Text(
             'Are you sure you want to log out of your account?',
-            style: TextStyle(
-              color: _mutedText,
-              height: 1.5,
-            ),
+            style: TextStyle(color: _mutedText, height: 1.5),
           ),
           actions: [
             TextButton(
@@ -1141,24 +1048,16 @@ class _ProfileTabState extends State<ProfileTab> {
       height: 54,
       child: OutlinedButton.icon(
         onPressed: _confirmLogout,
-        icon: const Icon(
-          Icons.logout_rounded,
-          size: 19,
-        ),
+        icon: const Icon(Icons.logout_rounded, size: 19),
         label: const Text(
           'Log Out',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: _danger,
           backgroundColor: _surfaceColor,
           side: BorderSide(
-            color: _isDark
-                ? const Color(0xFF714746)
-                : const Color(0xFFE8C7C5),
+            color: _isDark ? const Color(0xFF714746) : const Color(0xFFE8C7C5),
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(17),
@@ -1174,10 +1073,7 @@ class _ProfileTabState extends State<ProfileTab> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 }
@@ -1221,9 +1117,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: widget.surfaceColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       icon: const Icon(
         Icons.manage_accounts_outlined,
         color: Color(0xFF0F766E),
@@ -1250,9 +1144,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
             prefixIcon: const Icon(Icons.person_outline_rounded),
             filled: true,
             fillColor: widget.pageColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
