@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../blocs/auth/auth_cubit.dart';
 import '../../blocs/theme/theme_cubit.dart';
+import '../../../data/services/notification_service.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -27,6 +28,19 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _isSavingProfile = false;
 
   final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationPreference();
+  }
+
+  Future<void> _loadNotificationPreference() async {
+    final enabled =
+    await NotificationService.instance.areNotificationsEnabled();
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = enabled);
+  }
 
   static const Color _navy = Color(0xFF101D2C);
   static const Color _navyLight = Color(0xFF1B3042);
@@ -151,9 +165,24 @@ class _ProfileTabState extends State<ProfileTab> {
             ],
           ),
         ),
-       ]
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: _surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _lineColor),
+          ),
+          child: const Icon(
+            Icons.person_outline_rounded,
+            color: _emerald,
+            size: 24,
+          ),
+        ),
+      ],
     );
   }
+
   // Account card
   Widget _buildAccountCard(String name, String email) {
     final initials = _getInitials(name);
@@ -789,16 +818,19 @@ class _ProfileTabState extends State<ProfileTab> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                      'Enable notifications',
+                      'Device notifications',
                       style: TextStyle(color: _primaryText),
                     ),
                     subtitle: Text(
-                      'Turn app alerts on or off',
+                      'Choose whether to receive notifications on your phone',
                       style: TextStyle(color: _mutedText),
                     ),
                     value: _notificationsEnabled,
                     activeTrackColor: _emerald,
-                    onChanged: (value) {
+                    onChanged: (value) async {
+                      await NotificationService.instance
+                          .setNotificationsEnabled(value);
+                      if (!mounted) return;
                       setDialogState(() {
                         _notificationsEnabled = value;
                       });
