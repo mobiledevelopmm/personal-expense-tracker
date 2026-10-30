@@ -44,7 +44,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final fixed = amount.abs().toStringAsFixed(2).split('.');
     final whole = fixed[0].replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (_) => ',',
+          (_) => ',',
     );
     return '${amount < 0 ? '-' : ''}\$$whole.${fixed[1]}';
   }
@@ -76,16 +76,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   List<ExpenseTransaction> _filterTransactions(
-    List<ExpenseTransaction> transactions,
-  ) {
+      List<ExpenseTransaction> transactions,
+      ) {
     switch (_period) {
       case _Period.month:
         return transactions
             .where(
               (t) =>
-                  t.date.year == _selectedMonth.year &&
-                  t.date.month == _selectedMonth.month,
-            )
+          t.date.year == _selectedMonth.year &&
+              t.date.month == _selectedMonth.month,
+        )
             .toList();
 
       case _Period.year:
@@ -236,7 +236,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               if (transaction.type == TransactionType.expense) {
                 categoryTotals.update(
                   transaction.category,
-                  (value) => value + transaction.amount,
+                      (value) => value + transaction.amount,
                   ifAbsent: () => transaction.amount,
                 );
               }
@@ -247,7 +247,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
             final totalExpense = sortedCategories.fold<double>(
               0,
-              (sum, entry) => sum + entry.value,
+                  (sum, entry) => sum + entry.value,
+            );
+
+            // Build income totals separately so expense and income charts
+            // never mix transaction types.
+            final incomeCategoryTotals = <String, double>{};
+
+            for (final transaction in transactions) {
+              if (transaction.type == TransactionType.income) {
+                incomeCategoryTotals.update(
+                  transaction.category,
+                      (value) => value + transaction.amount,
+                  ifAbsent: () => transaction.amount,
+                );
+              }
+            }
+
+            final sortedIncomeCategories =
+            incomeCategoryTotals.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value));
+
+            final totalIncomeByCategory =
+            sortedIncomeCategories.fold<double>(
+              0,
+                  (sum, entry) => sum + entry.value,
             );
 
             return RefreshIndicator(
@@ -449,89 +473,209 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                     child: totalExpense <= 0
                         ? Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 36),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.pie_chart_outline_rounded,
-                                  size: 54,
-                                  color: _muted,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No expense data for $_periodLabel',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: _text,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  'Add an expense to see your chart.',
-                                  style: TextStyle(color: _muted, fontSize: 12),
-                                ),
-                              ],
+                      padding: const EdgeInsets.symmetric(vertical: 36),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.pie_chart_outline_rounded,
+                            size: 54,
+                            color: _muted,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No expense data for $_periodLabel',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _text,
+                              fontWeight: FontWeight.w700,
                             ),
-                          )
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Add an expense to see your chart.',
+                            style: TextStyle(color: _muted, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    )
                         : Column(
-                            children: [
-                              SizedBox(
-                                height: 220,
-                                child: PieChart(
-                                  PieChartData(
-                                    sectionsSpace: 3,
-                                    centerSpaceRadius: 58,
-                                    startDegreeOffset: -90,
-                                    sections: [
-                                      for (
-                                        int i = 0;
-                                        i < sortedCategories.length;
-                                        i++
-                                      )
-                                        PieChartSectionData(
-                                          value: sortedCategories[i].value,
-                                          color:
-                                              _chartColors[i %
-                                                  _chartColors.length],
-                                          radius: 27,
-                                          showTitle: false,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              Text(
-                                'Total Expenses',
-                                style: TextStyle(color: _muted, fontSize: 12),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                _money(totalExpense),
-                                style: TextStyle(
-                                  color: _text,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 22),
-                              for (
+                      children: [
+                        SizedBox(
+                          height: 220,
+                          child: PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 58,
+                              startDegreeOffset: -90,
+                              sections: [
+                                for (
                                 int i = 0;
                                 i < sortedCategories.length;
                                 i++
-                              ) ...[
-                                _categoryRow(
-                                  name: sortedCategories[i].key,
-                                  amount: sortedCategories[i].value,
-                                  total: totalExpense,
-                                  color: _chartColors[i % _chartColors.length],
-                                ),
-                                if (i < sortedCategories.length - 1)
-                                  Divider(height: 20, color: _border),
+                                )
+                                  PieChartSectionData(
+                                    value: sortedCategories[i].value,
+                                    color:
+                                    _chartColors[i %
+                                        _chartColors.length],
+                                    radius: 27,
+                                    showTitle: false,
+                                  ),
                               ],
-                            ],
+                            ),
                           ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Total Expenses',
+                          style: TextStyle(color: _muted, fontSize: 12),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _money(totalExpense),
+                          style: TextStyle(
+                            color: _text,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        for (
+                        int i = 0;
+                        i < sortedCategories.length;
+                        i++
+                        ) ...[
+                          _categoryRow(
+                            name: sortedCategories[i].key,
+                            amount: sortedCategories[i].value,
+                            total: totalExpense,
+                            color: _chartColors[i % _chartColors.length],
+                          ),
+                          if (i < sortedCategories.length - 1)
+                            Divider(height: 20, color: _border),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Income breakdown uses the same selected Month / Year /
+                  // All Time period as the expense breakdown above.
+                  Text(
+                    'Income Breakdown',
+                    style: TextStyle(
+                      color: _text,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Income by category · $_periodLabel',
+                    style: TextStyle(color: _muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: _border),
+                    ),
+                    child: totalIncomeByCategory <= 0
+                        ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 36),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.pie_chart_outline_rounded,
+                            size: 54,
+                            color: _muted,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No income data for $_periodLabel',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _text,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Add an income to see your chart.',
+                            style: TextStyle(
+                              color: _muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                        : Column(
+                      children: [
+                        SizedBox(
+                          height: 220,
+                          child: PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 58,
+                              startDegreeOffset: -90,
+                              sections: [
+                                for (
+                                int i = 0;
+                                i < sortedIncomeCategories.length;
+                                i++
+                                )
+                                  PieChartSectionData(
+                                    value:
+                                    sortedIncomeCategories[i].value,
+                                    color: _chartColors[
+                                    i % _chartColors.length],
+                                    radius: 27,
+                                    showTitle: false,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Total Income',
+                          style: TextStyle(
+                            color: _muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _money(totalIncomeByCategory),
+                          style: TextStyle(
+                            color: _text,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        for (
+                        int i = 0;
+                        i < sortedIncomeCategories.length;
+                        i++
+                        ) ...[
+                          _categoryRow(
+                            name: sortedIncomeCategories[i].key,
+                            amount: sortedIncomeCategories[i].value,
+                            total: totalIncomeByCategory,
+                            color: _chartColors[
+                            i % _chartColors.length],
+                          ),
+                          if (i < sortedIncomeCategories.length - 1)
+                            Divider(height: 20, color: _border),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ),
