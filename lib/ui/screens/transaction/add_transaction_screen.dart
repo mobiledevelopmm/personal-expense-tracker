@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../models/transaction.dart';
-import '../../../data/services/notification_service.dart';
+import '../../../data/services/category_service.dart';
 import '../../blocs/transaction/transaction_cubit.dart';
 import '../notification/notification_cubit.dart';
 
@@ -20,13 +19,15 @@ class AddTransactionScreen extends StatefulWidget {
   bool get isEditing => transaction != null;
 
   @override
-  State<AddTransactionScreen> createState() => _AddTransactionScreenState();
+  State<AddTransactionScreen> createState() =>
+      _AddTransactionScreenState();
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
+  final CategoryService _categoryService = CategoryService();
 
   late TransactionType _type;
   late DateTime _date;
@@ -34,51 +35,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _saving = false;
   bool _loadingCategories = true;
 
-  static const String _incomeKey = 'custom_income_categories';
-  static const String _expenseKey = 'custom_expense_categories';
-
-  static const List<String> _incomeCategories = [
-    'Salary',
-    'Business',
-    'Investment',
-    'Gift',
-    'Other',
-  ];
-
-  static const List<String> _expenseCategories = [
-    'Food',
-    'Transport',
-    'Shopping',
-    'Bills',
-    'Health',
-    'Education',
-    'Entertainment',
-    'Other',
-  ];
-
-  List<String> _customIncomeCategories = [];
-  List<String> _customExpenseCategories = [];
+  List<String> _incomeCategories = [];
+  List<String> _expenseCategories = [];
 
   String? _category;
 
-  List<String> get _categories {
-    final defaults = _type == TransactionType.income
-        ? _incomeCategories
-        : _expenseCategories;
-
-    final custom = _type == TransactionType.income
-        ? _customIncomeCategories
-        : _customExpenseCategories;
-
-    return [...defaults, ...custom];
-  }
+  List<String> get _categories => _type == TransactionType.income
+      ? _incomeCategories
+      : _expenseCategories;
 
   @override
   void initState() {
     super.initState();
-
     final existing = widget.transaction;
-
     _type = existing?.type ?? widget.initialType;
     _date = existing?.date ?? DateTime.now();
     _category = existing?.category;
@@ -87,54 +56,63 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _amountController.text = existing.amount.toString();
       _noteController.text = existing.note;
     }
-
     _loadCategories();
   }
 
   Future<void> _loadCategories() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      await _categoryService.initializeDefaultCategories();
 
-      if (!mounted) return;
+      final results = await Future.wait([
+        _categoryService.getCategories('income'),
+        _categoryService.getCategories('expense'),
+      ]);
 
-      setState(() {
-        _customIncomeCategories = prefs.getStringList(_incomeKey) ?? [];
-        _customExpenseCategories = prefs.getStringList(_expenseKey) ?? [];
+      var incomeCategories = results[0];
+      var expenseCategories = results[1];
 
-        _category ??= _categories.first;
+      final existingCategory = _category;
+      if (existingCategory != null && existingCategory.trim().isNotEmpty) {
+        final currentList = _type == TransactionType.income
+            ? incomeCategories
+            : expenseCategories;
+        final exists = currentList.any(
+              (item) => item.toLowerCase() == existingCategory.toLowerCase(),
+        );
 
-        // Keep an existing category even if it is no longer
-        // in the default or custom category lists.
-        if (!_categories.contains(_category)) {
+        if (!exists) {
+          await _categoryService.addCategory(
+            name: existingCategory,
+            type: _type == TransactionType.income ? 'income' : 'expense',
+          );
+          final refreshed = await _categoryService.getCategories(
+            _type == TransactionType.income ? 'income' : 'expense',
+          );
           if (_type == TransactionType.income) {
-            _customIncomeCategories.add(_category!);
+            incomeCategories = refreshed;
           } else {
-            _customExpenseCategories.add(_category!);
+            expenseCategories = refreshed;
           }
         }
+      }
 
+      if (!mounted) return;
+      setState(() {
+        _incomeCategories = incomeCategories;
+        _expenseCategories = expenseCategories;
+        _category ??= _categories.isNotEmpty ? _categories.first : null;
+        if (_category != null && !_categories.contains(_category)) {
+          _category = _categories.isNotEmpty ? _categories.first : null;
+        }
         _loadingCategories = false;
       });
     } catch (error) {
       if (!mounted) return;
-
-      setState(() {
-        _category ??= _categories.first;
-        _loadingCategories = false;
-      });
-
+      setState(() => _loadingCategories = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not load categories: $error')),
       );
     }
-  }
-
-  Future<void> _persistCategories() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setStringList(_incomeKey, _customIncomeCategories);
-
-    await prefs.setStringList(_expenseKey, _customExpenseCategories);
   }
 
   Future<void> _addCategory() async {
@@ -142,57 +120,47 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     final newCategory = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Add New Category'),
-          content: TextField(
-            autofocus: true,
-            maxLength: 40,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Category name',
-              hintText: 'e.g. Freelance or Pet Care',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (value) => enteredName = value,
-            onSubmitted: (value) {
-              final name = value.trim();
-
-              if (name.isNotEmpty) {
-                Navigator.pop(dialogContext, name);
-              }
-            },
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add New Category'),
+        content: TextField(
+          autofocus: true,
+          maxLength: 40,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Category name',
+            hintText: 'e.g. Freelance or Pet Care',
+            border: OutlineInputBorder(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                final name = enteredName.trim();
-
-                if (name.isNotEmpty) {
-                  Navigator.pop(dialogContext, name);
-                }
-              },
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Add'),
-            ),
-          ],
-        );
-      },
+          onChanged: (value) => enteredName = value,
+          onSubmitted: (value) {
+            final name = value.trim();
+            if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              final name = enteredName.trim();
+              if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+            },
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Add'),
+          ),
+        ],
+      ),
     );
 
     if (!mounted || newCategory == null) return;
-
     final name = newCategory.trim();
     if (name.isEmpty) return;
 
     final duplicate = _categories.any(
-      (category) => category.toLowerCase() == name.toLowerCase(),
+          (category) => category.toLowerCase() == name.toLowerCase(),
     );
-
     if (duplicate) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This category already exists.')),
@@ -200,40 +168,35 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
-    setState(() {
-      if (_type == TransactionType.income) {
-        _customIncomeCategories.add(name);
-      } else {
-        _customExpenseCategories.add(name);
-      }
-
-      _category = name;
-    });
-
+    setState(() => _saving = true);
     try {
-      await _persistCategories();
+      await _categoryService.addCategory(
+        name: name,
+        type: _type == TransactionType.income ? 'income' : 'expense',
+      );
+      final updatedCategories = await _categoryService.getCategories(
+        _type == TransactionType.income ? 'income' : 'expense',
+      );
 
       if (!mounted) return;
-
+      setState(() {
+        if (_type == TransactionType.income) {
+          _incomeCategories = updatedCategories;
+        } else {
+          _expenseCategories = updatedCategories;
+        }
+        _category = name;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Category added successfully.')),
+        const SnackBar(content: Text('Category saved successfully!')),
       );
     } catch (error) {
       if (!mounted) return;
-
-      setState(() {
-        if (_type == TransactionType.income) {
-          _customIncomeCategories.remove(name);
-        } else {
-          _customExpenseCategories.remove(name);
-        }
-
-        _category = _categories.first;
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not save category: $error')),
       );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -251,10 +214,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
-
-    if (selected != null && mounted) {
-      setState(() => _date = selected);
-    }
+    if (selected != null && mounted) setState(() => _date = selected);
   }
 
   Future<void> _saveTransaction() async {
@@ -265,10 +225,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     if (category == null) return;
 
     setState(() => _saving = true);
-
     try {
       final existing = widget.transaction;
-
       final updatedTransaction = ExpenseTransaction(
         id: existing?.id ?? '',
         type: _type,
@@ -279,62 +237,37 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       );
 
       final cubit = context.read<TransactionCubit>();
-
       if (existing != null) {
         await cubit.updateTransaction(existing.id, updatedTransaction);
       } else {
-        // Save the new transaction first.
         await cubit.addTransaction(updatedTransaction);
-
         if (!mounted) return;
 
+        final notificationCubit = context.read<NotificationCubit>();
         final isIncome = _type == TransactionType.income;
-        final title = isIncome ? 'Income Added' : 'Expense Added';
-        final message =
-            '${isIncome ? 'Income' : 'Expense'} of '
-            '\$${updatedTransaction.amount.toStringAsFixed(2)} '
-            'in $category was saved successfully.';
-
-        // Add a notification inside the app.
-        try {
-          await context.read<NotificationCubit>().addNotification(
-            title: title,
-            message: message,
-          );
-        } catch (error) {
-          debugPrint('In-app notification error: $error');
-        }
-
-        // Also show a notification in the phone notification bar.
-        try {
-          await NotificationService.instance.showTransactionNotification(
-            id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-            title: title,
-            body: message,
-          );
-        } catch (error) {
-          debugPrint('Phone notification error: $error');
-        }
+        await notificationCubit.addNotification(
+          title: isIncome ? 'Income Added' : 'Expense Added',
+          message:
+          '${isIncome ? 'Income' : 'Expense'} of '
+              '\$${updatedTransaction.amount.toStringAsFixed(2)} '
+              'in $category was saved successfully.',
+        );
       }
 
       if (!mounted) return;
-
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Could not ${widget.isEditing ? 'update' : 'save'} '
-            'transaction: $error',
+                'transaction: $error',
           ),
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -377,10 +310,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 onSelectionChanged: (values) {
                   setState(() {
                     _type = values.first;
-
-                    if (!_categories.contains(_category)) {
-                      _category = _categories.first;
-                    }
+                    _category = _categories.isNotEmpty ? _categories.first : null;
                   });
                 },
               ),
@@ -389,9 +319,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               const SizedBox(height: 10),
               TextFormField(
                 controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   prefixText: '\$ ',
                   hintText: '0.00',
@@ -399,11 +328,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 ),
                 validator: (value) {
                   final amount = double.tryParse(value?.trim() ?? '');
-
                   if (amount == null || !amount.isFinite || amount <= 0) {
                     return 'Enter a valid amount greater than zero.';
                   }
-
                   return null;
                 },
               ),
@@ -411,10 +338,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Category', style: theme.textTheme.titleMedium),
+                    child: Text(
+                      'Category',
+                      style: theme.textTheme.titleMedium,
+                    ),
                   ),
                   TextButton.icon(
-                    onPressed: _loadingCategories ? null : _addCategory,
+                    onPressed:
+                    _loadingCategories || _saving ? null : _addCategory,
                     icon: const Icon(Icons.add_circle_outline, size: 19),
                     label: const Text('Add Category'),
                   ),
@@ -428,6 +359,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     child: CircularProgressIndicator(),
                   ),
                 )
+              else if (_categories.isEmpty)
+                const Text('No categories available.')
               else
                 DropdownButtonFormField<String>(
                   key: ValueKey('$_type-$_category'),
@@ -446,12 +379,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     );
                   }).toList(),
                   onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _category = value);
-                    }
+                    if (value != null) setState(() => _category = value);
                   },
-                  validator: (value) =>
-                      value == null ? 'Please select a category.' : null,
+                  validator: (value) => value == null
+                      ? 'Please select a category.'
+                      : null,
                 ),
               const SizedBox(height: 22),
               Text('Date', style: theme.textTheme.titleMedium),
@@ -484,10 +416,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       : _saveTransaction,
                   icon: _saving
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                       : const Icon(Icons.check_rounded),
                   label: Text(
                     _saving
@@ -497,9 +429,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         : 'Save ${isIncome ? 'Income' : 'Expense'}',
                   ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: isIncome
-                        ? const Color(0xFF168568)
-                        : colors.primary,
+                    backgroundColor:
+                    isIncome ? const Color(0xFF168568) : colors.primary,
                   ),
                 ),
               ),
