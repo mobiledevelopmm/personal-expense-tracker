@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../data/services/category_service.dart';
 import '../../data/services/transaction_service.dart';
 import '../blocs/transaction/transaction_cubit.dart';
 import 'home/analytics_screen.dart';
@@ -18,6 +19,25 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCategories();
+    });
+  }
+
+  Future<void> _initializeCategories() async {
+    try {
+      await CategoryService().initializeDefaultCategories();
+      debugPrint('CATEGORY SAVE SUCCESS');
+    } catch (e, stackTrace) {
+      debugPrint('CATEGORY SAVE FAILED: $e');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
   final List<Widget> _pages = const [
     HomeTab(),
     AnalyticsScreen(),
