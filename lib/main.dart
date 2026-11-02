@@ -17,7 +17,7 @@ Future<void> main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-  );
+  );//firebase နဲ့ ချိတ်ဆက်
 
   await NotificationService.instance.initialize();
 

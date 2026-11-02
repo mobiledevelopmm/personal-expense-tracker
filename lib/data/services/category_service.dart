@@ -26,9 +26,9 @@ class CategoryService {
 
   CollectionReference<Map<String, dynamic>> _categoriesRef(String uid) {
     return _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('categories');
+        .collection('users')//user collection
+        .doc(uid)// login user document
+        .collection('categories');//user categories
   }
 
   Future<void> initializeDefaultCategories() async {
@@ -43,8 +43,8 @@ class CategoryService {
     // Add defaults without deleting custom categories.
     await categoriesRef.doc('income_categories').set({
       'type': 'income',
-      'categories': FieldValue.arrayUnion(incomeCategories),
-    }, SetOptions(merge: true));
+      'categories': FieldValue.arrayUnion(incomeCategories),//add new value
+    }, SetOptions(merge: true));//document field update
 
     await categoriesRef.doc('expense_categories').set({
       'type': 'expense',
@@ -98,7 +98,7 @@ class CategoryService {
       'type': type.toLowerCase(),
       'categories': FieldValue.arrayUnion([categoryName]),
     }, SetOptions(merge: true));
-  }
+  }//login user category
 
   Stream<List<String>> watchCategories(String type) {
     final user = _auth.currentUser;

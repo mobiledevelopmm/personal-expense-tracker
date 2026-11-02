@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,7 +28,7 @@ class TransactionService {
 
   CollectionReference<Map<String, dynamic>> _userTransactions() {
     final user = _requireUser();
-    return _userDocument(user).collection('transactions');
+    return _userDocument(user).collection('transactions');//user-uid-transactions
   }
 
   // Make sure the parent users/{uid} document exists before saving a transaction.
@@ -51,7 +50,7 @@ class TransactionService {
   Stream<List<ExpenseTransaction>> watchTransactions() {
     return _userTransactions()
         .orderBy('date', descending: true)
-        .snapshots()
+        .snapshots()//date အလိုက်နောက်ဆုံးထည့်တာက အရင်ပြ-real time stream နဲ့ကြည့်
         .map(
           (snapshot) => snapshot.docs
           .map(
